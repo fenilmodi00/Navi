@@ -1,0 +1,38 @@
+{
+  "name": "@navi/plugin-sdl-builder",
+  "version": "1.0.0",
+  "description": "ElizaOS plugin for Akash Network SDL template generation and validation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest"
+  },
+  "keywords": [
+    "eliza",
+    "elizaos",
+    "plugin",
+    "akash",
+    "sdl",
+    "deployment",
+    "kubernetes"
+  ],
+  "author": "Navi Team",
+  "license": "MIT",
+  "dependencies": {
+    "@elizaos/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsup": "^8.0.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

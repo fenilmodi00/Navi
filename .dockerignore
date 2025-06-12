@@ -1,0 +1,97 @@
+# Optimized .dockerignore for Navi ElizaOS project
+
+# Node modules (will be installed in container)
+node_modules
+
+
+
+# Data directories - mount as volumes instead
+
+
+# Documentation and metadata files
+README*
+*.md
+LICENSE*
+CHANGELOG*
+CONTRIBUTING*
+AUTHORS*
+NOTICE*
+COPYING*
+
+# Test files and directories
+**/*.test.*
+**/*.spec.*
+**/test/
+**/tests/
+**/__tests__/
+**/__mocks__/
+**/coverage/
+.nyc_output/
+jest.config.*
+vitest.config.*
+cypress.json
+cypress/
+e2e/
+# Development and build artifacts
+.cache/
+.turbo/
+.next/
+.nuxt/
+build/
+out/
+
+# Log files
+*.log
+*.tmp
+*.temp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Git and development files
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment files (except example)
+.env*
+!.env.example
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Package manager files and caches
+.npm/
+.pnpm-store/
+.yarn/
+yarn.lock
+package-lock.json
+
+# ElizaOS specific
+.eliza/
+knowledge/
+
+# Plugin assets and docs (keep source code)
+plugins/**/images/
+plugins/**/assets/
+plugins/**/docs/
+plugins/**/*.md
+plugins/**/README*
+plugins/**/LICENSE*
+
+# OS specific files
+.Spotlight-V100
+.Trashes
