@@ -7,14 +7,16 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
+    image: akash-navi:v2
     ports:
       - "3000:3000"
       - "50000-50100:50000-50100/udp"
     environment:
       - NODE_ENV=production
+    env_file:
+      - .env
     volumes:
       - ./data:/app/data
-      - ./.env:/app/.env:ro
     restart: unless-stopped
 
   # Production build

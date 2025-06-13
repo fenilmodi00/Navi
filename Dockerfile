@@ -1,5 +1,9 @@
 FROM node:20-alpine AS builder
 
+# Build arguments for configuration
+ARG NODE_ENV=production
+ARG BUILD_VERSION=latest
+
 WORKDIR /app
 
 # Install system dependencies
@@ -13,21 +17,21 @@ RUN apk add --no-cache \
 # Install bun globally
 RUN npm install -g bun@1.2.5
 
-# Create python symlink
-RUN ln -s /usr/bin/python3 /usr/bin/python
+# Create python symlink if it doesn't exist
+RUN if [ ! -f /usr/bin/python ]; then ln -s /usr/bin/python3 /usr/bin/python; fi
 
-# Copy package files and configurations
-COPY package.json bun.lock bunfig.toml tsconfig.json tsup.config.ts ./
+# Copy package files first for better caching
+COPY package.json bun.lock bunfig.toml ./
 
-# Copy source code and plugins
+# Copy configuration files
+COPY tsconfig.json tsup.config.ts ./
+
+# Copy plugins and source code (needed for workspace dependencies)
 COPY src ./src
 COPY plugins ./plugins
 
-# Copy data directory for knowledge base
-COPY data ./data
-
-# Install dependencies and build
-RUN bun install --production --no-cache
+# Install dependencies (after workspace plugins are available)
+RUN bun install
 
 # Build the project
 RUN bun run build
@@ -36,7 +40,8 @@ RUN bun run build
 RUN rm -rf node_modules/.cache \
     && rm -rf /root/.bun/install/cache \
     && find . -name "*.test.*" -delete \
-    && find . -name "*.spec.*" -delete
+    && find . -name "*.spec.*" -delete \
+    && bun install --production --frozen-lockfile
 
 # Production stage
 FROM node:20-alpine
@@ -48,7 +53,8 @@ RUN apk add --no-cache \
     curl \
     ffmpeg \
     git \
-    python3
+    python3 \
+    dumb-init
 
 # Install bun globally
 RUN npm install -g bun@1.2.5
@@ -59,6 +65,9 @@ COPY --from=builder /app/bunfig.toml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/plugins ./plugins
+
+# Create necessary directories for ElizaOS
+RUN mkdir -p data .eliza
 
 # Set environment to production
 ENV NODE_ENV=production
@@ -71,5 +80,6 @@ EXPOSE 50000-50100/udp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the application with the built project file
+# Use dumb-init to handle signals properly and start as non-root
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["./node_modules/.bin/elizaos", "start", "./dist/index.js"]
