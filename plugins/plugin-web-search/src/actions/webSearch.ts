@@ -172,36 +172,79 @@ export const webSearch: Action = {
         "WEB_LOOKUP",
         "ONLINE_SEARCH",
         "FIND_INFORMATION",
+        "FETCH_INFO",
+        "GET_LATEST",
+        "SEARCH_FOR",
+        "LOOK_UP"
     ],
-    suppressInitialMessage: true,
+    suppressInitialMessage: false,
     description:
-        "Perform a web search to find information related to the message.",
+        "Perform a web search to find current information, latest updates, or real-time data related to the user's query.",
     // eslint-disable-next-line
     validate: async (runtime: IAgentRuntime, message: Memory) => {
         const tavilyApiKeyOk = !!runtime.getSetting("TAVILY_API_KEY");
         
         if (!tavilyApiKeyOk) {
+            elizaLogger.warn("Web search validation failed: TAVILY_API_KEY not found");
             return false;
         }
         
         // Check if message content should trigger web search
         const text = message.content.text?.toLowerCase() || '';
+        
+        // Enhanced triggers including common user queries and follow-up search needs
         const webSearchTriggers = [
+            // Time-based queries
             'latest', 'recent', 'news', 'update', 'announcement', 'today', 
             'this week', 'this month', 'roadmap', 'upcoming', 'release', 
-            'social media', 'twitter', 'discord announcement', 'blog post',
-            'new feature', 'just released', 'yesterday', 'current', 'now',
+            'current', 'now', 'yesterday', 'just released', 'new feature',
             'what is happening', 'what happened', 'status', 'progress',
             'development', 'launched', 'launching', 'released', 'deployed',
-            // Add price-related triggers for real-time data
+            
+            // Media and content
+            'social media', 'twitter', 'discord announcement', 'blog post',
+            'tweet', 'tweeting', 'twitter updates', 'social updates',
+            
+            // Financial and pricing
             'price', 'cost', 'current price', 'today price', 'coinbase', 'exchange',
-            'trading', 'market', 'value', 'worth', 'usd', 'dollar',
-            // Add bridging and transfer related triggers
+            'trading', 'market', 'value', 'worth', 'usd', 'dollar', 'token price',
+            'akt price', 'akt cost', 'market cap', 'trading volume',
+            
+            // Technical operations
             'bridge', 'bridging', 'transfer', 'move tokens', 'send tokens',
-            'ibc', 'cross-chain', 'osmosis', 'cosmos', 'keplr', 'withdraw', 'deposit'
+            'ibc', 'cross-chain', 'osmosis', 'cosmos', 'keplr', 'withdraw', 'deposit',
+            
+            // Provider and deployment related
+            'provider', 'providers', 'deployment cost', 'runtime cost', 'actual cost',
+            'calculator', 'calculate cost', 'cost calculation', 'pricing tool',
+            'provider earnings', 'provider rewards', 'marketplace',
+            
+            // Network and troubleshooting
+            'down', 'offline', 'not working', 'issues', 'problem', 'error',
+            'network status', 'mainnet', 'testnet', 'validator',
+            
+            // Search intent indicators
+            'find', 'search', 'look up', 'check', 'verify', 'confirm',
+            'get me', 'show me', 'tell me about recent', 'any updates',
+            
+            // Explicit search requests
+            'web search', 'search the web', 'look online', 'check online',
+            'find online', 'internet search', 'google it', 'search for'
         ];
         
-        return webSearchTriggers.some(trigger => text.includes(trigger));
+        // Also check for explicit mentions of searching or finding current info
+        const searchIntentPhrases = [
+            'search for', 'find out', 'look up', 'check the', 'get current',
+            'find the latest', 'search web', 'web search', 'internet search',
+            'look online', 'check online', 'find online', 'verify online'
+        ];
+        
+        const hasSearchTrigger = webSearchTriggers.some(trigger => text.includes(trigger));
+        const hasSearchIntent = searchIntentPhrases.some(phrase => text.includes(phrase));
+        
+        elizaLogger.log(`Web search validation: text="${text}", hasSearchTrigger=${hasSearchTrigger}, hasSearchIntent=${hasSearchIntent}`);
+        
+        return hasSearchTrigger || hasSearchIntent;
     },
     handler: async (
         runtime: IAgentRuntime,
@@ -210,27 +253,34 @@ export const webSearch: Action = {
         options: any,
         callback: HandlerCallback
     ) => {
-        elizaLogger.log("Composing state for message:", message);
+        elizaLogger.log("Starting web search for message:", message.content.text);
+        
+        // Compose state first
         state = (await runtime.composeState(message)) as State;
-        const userId = runtime.agentId;
-        elizaLogger.log("User ID:", userId);
-
+        
         const webSearchPrompt = message.content.text;
-        elizaLogger.log("web search prompt received:", webSearchPrompt);
+        elizaLogger.log("Web search prompt:", webSearchPrompt);
+
+        // Send initial response to let user know we're searching
+        callback({
+            text: "🔍 Searching for the latest information...",
+            thought: "User is asking for current information that requires web search. I'll search and provide the results."
+        });
 
         const webSearchService = new WebSearchService();
-        await webSearchService.initialize(runtime);
         
         try {
-            const searchResponse = await webSearchService.search(
-                webSearchPrompt,
-            );
+            await webSearchService.initialize(runtime);
             
-            if (searchResponse && searchResponse.results.length) {
+            const searchResponse = await webSearchService.search(webSearchPrompt);
+            
+            if (searchResponse && searchResponse.results && searchResponse.results.length > 0) {
+                elizaLogger.log(`Found ${searchResponse.results.length} search results`);
+                
                 // Check if we have an answer from the API
                 const answer = searchResponse.answer 
                     ? `${searchResponse.answer}\n\n` 
-                    : "Here's what I found about your query:\n\n";
+                    : "Here's what I found:\n\n";
                 
                 // Format the results in a readable way
                 const formattedResults = formatSearchResults(searchResponse.results);
@@ -241,26 +291,39 @@ export const webSearch: Action = {
                 );
                 
                 // Combine the answer and results
-                let disclaimer = "This information is based on web search results and may need verification from official Akash sources.";
+                let disclaimer = "\n\n*This information is based on current web search results and may need verification from official Akash sources.*";
                 if (hasTwitterResults) {
-                    disclaimer += " Tweet content is from the official Akash Network Twitter account.";
+                    disclaimer += " *Tweet content is from verified sources.*";
                 }
                 
-                const responseText = `${answer}${formattedResults}\n\n${disclaimer}`;
+                const responseText = `${answer}${formattedResults}${disclaimer}`;
                 
+                // Send the final response with search results
                 callback({
                     text: MaxTokens(responseText, DEFAULT_MAX_WEB_SEARCH_TOKENS),
+                    thought: "Successfully retrieved and formatted web search results for the user's query."
                 });
+                
+                elizaLogger.log("Web search completed successfully");
             } else {
-                elizaLogger.error("search failed or returned no data.");
+                elizaLogger.warn("Web search returned no results");
                 callback({
-                    text: "I couldn't find any relevant information about your query. Please try rephrasing your question or ask about a different topic related to Akash Network."
+                    text: "I searched for information about your query but couldn't find relevant results at the moment. This might be due to:\n\n" +
+                          "• The topic being too specific or new\n" +
+                          "• Temporary search service issues\n" +
+                          "• Limited information available online\n\n" +
+                          "Please try rephrasing your question or ask about a different aspect of the topic. For Akash-specific questions, I can also help using my knowledge base."
                 });
             }
         } catch (error) {
             elizaLogger.error("Error during web search:", error);
+            
+            // Provide helpful error message to user
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            
             callback({
-                text: "I encountered an error while searching for information. Please try again later or rephrase your question."
+                text: `I encountered an issue while searching for information: ${errorMessage}\n\n` +
+                      "Please try again in a moment. If the problem persists, I can still help using my knowledge base for Akash Network questions."
             });
         }
     },

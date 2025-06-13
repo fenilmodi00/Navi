@@ -340,13 +340,16 @@ export class WebSearchService extends Service implements IWebSearchService {
         const timeout = parseInt(process.env.WEB_SEARCH_TIMEOUT || '20000'); // 20 second timeout
         const maxResults = parseInt(process.env.WEB_SEARCH_MAX_RESULTS || '5'); // Increase results
         
-        elizaLogger.log(`Starting web search for: "${query}"`);
+        // Clean and optimize the query for better search results
+        const optimizedQuery = this.optimizeSearchQuery(query);
+        
+        elizaLogger.log(`Starting web search for: "${optimizedQuery}"`);
         elizaLogger.log(`Search settings - timeout: ${timeout}ms, maxResults: ${maxResults}`);
         
         // Check for special topics first
-        const specialTopic = getSpecialTopicFromQuery(query);
+        const specialTopic = getSpecialTopicFromQuery(optimizedQuery);
         if (specialTopic) {
-            elizaLogger.log(`Found special topic for query "${query}":`, specialTopic.name);
+            elizaLogger.log(`Found special topic for query "${optimizedQuery}":`, specialTopic.name);
             
             // Return special topic links as search results
             const specialResults = specialTopic.links.map(link => ({
@@ -360,17 +363,17 @@ export class WebSearchService extends Service implements IWebSearchService {
             return {
                 results: specialResults,
                 answer: `Here are the official resources for ${specialTopic.name}:`,
-                query: query,
+                query: optimizedQuery,
                 responseTime: 0,
                 images: []
             };
         }
         
         try {
-            elizaLogger.log(`Performing Tavily search for: "${query}"`);
+            elizaLogger.log(`Performing Tavily search for: "${optimizedQuery}"`);
             
             // Simplified search - just do one search with timeout
-            const searchPromise = this.tavilyClient.search(query, {
+            const searchPromise = this.tavilyClient.search(optimizedQuery, {
                 includeAnswer: options?.includeAnswer || true,
                 maxResults: maxResults,
                 topic: options?.type || "general",
@@ -395,8 +398,8 @@ export class WebSearchService extends Service implements IWebSearchService {
             // Return a fallback response
             return {
                 results: [],
-                answer: `I couldn't search for current information about "${query}" right now. For the latest AKT price, you can check CoinGecko, CoinMarketCap, or your preferred crypto exchange. Is there anything about Akash Network deployments I can help you with instead?`,
-                query: query,
+                answer: `I couldn't search for current information about "${optimizedQuery}" right now. For the latest AKT price, you can check CoinGecko, CoinMarketCap, or your preferred crypto exchange. Is there anything about Akash Network deployments I can help you with instead?`,
+                query: optimizedQuery,
                 responseTime: 0,
                 images: []
             };
@@ -471,5 +474,84 @@ export class WebSearchService extends Service implements IWebSearchService {
         }
         
         return combinedResults;
+    }
+
+    /**
+     * Optimize search query for better web search results
+     * Extracts key terms and makes queries more suitable for search APIs
+     */
+    private optimizeSearchQuery(query: string): string {
+        elizaLogger.log(`Original query length: ${query.length} characters`);
+        
+        // Remove excessive whitespace and normalize
+        let optimized = query.replace(/\s+/g, ' ').trim();
+        
+        // If query is too long (over 200 chars), extract key terms
+        if (optimized.length > 200) {
+            elizaLogger.log("Query too long, extracting key terms...");
+            
+            // Extract key Akash-related terms
+            const akashKeywords = this.extractAkashKeywords(optimized);
+            
+            // Extract important technical terms
+            const techKeywords = this.extractTechnicalKeywords(optimized);
+            
+            // Combine and create optimized query
+            const keywords = [...akashKeywords, ...techKeywords].slice(0, 8); // Limit to 8 keywords
+            optimized = keywords.join(' ');
+            
+            elizaLogger.log(`Optimized query (${optimized.length} chars): "${optimized}"`);
+        }
+        
+        // Always add "Akash Network" context if not present
+        if (!optimized.toLowerCase().includes('akash')) {
+            optimized = `Akash Network ${optimized}`;
+        }
+        
+        return optimized;
+    }
+
+    /**
+     * Extract Akash-specific keywords from query
+     */
+    private extractAkashKeywords(text: string): string[] {
+        const akashTerms = [
+            'akash', 'sdl', 'deployment', 'provider', 'kubernetes', 'docker',
+            'container', 'akt', 'mainnet', 'validator', 'port', 'mapping',
+            'service', 'expose', 'node', 'network', 'cli', 'console'
+        ];
+        
+        const found: string[] = [];
+        const lowerText = text.toLowerCase();
+        
+        for (const term of akashTerms) {
+            if (lowerText.includes(term) && !found.includes(term)) {
+                found.push(term);
+            }
+        }
+        
+        return found;
+    }
+
+    /**
+     * Extract technical keywords from query
+     */
+    private extractTechnicalKeywords(text: string): string[] {
+        const techTerms = [
+            'port', 'mapping', 'udp', 'tcp', 'public', 'expose', 'service',
+            'container', 'docker', 'kubernetes', 'deployment', 'shell',
+            'command', 'script', 'programmatically', 'api', 'cli'
+        ];
+        
+        const found: string[] = [];
+        const lowerText = text.toLowerCase();
+        
+        for (const term of techTerms) {
+            if (lowerText.includes(term) && !found.includes(term)) {
+                found.push(term);
+            }
+        }
+        
+        return found;
     }
 }

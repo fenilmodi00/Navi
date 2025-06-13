@@ -34,6 +34,45 @@ const clientCache = new Map<string, ReturnType<typeof createOpenAI>>();
 // Cache for tokenizers to avoid recreating them
 const tokenizerCache = new Map<string, any>();
 
+// Request queue to manage concurrent requests and respect rate limits
+class RequestQueue {
+  private queue: Array<() => Promise<any>> = [];
+  private activeRequests = 0;
+  private readonly maxConcurrentRequests = 8; // Increased from 2 for better throughput
+  
+  async enqueue<T>(requestFn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const wrappedRequest = async () => {
+        this.activeRequests++;
+        try {
+          const result = await requestFn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        } finally {
+          this.activeRequests--;
+          this.processQueue();
+        }
+      };
+      
+      this.queue.push(wrappedRequest);
+      this.processQueue();
+    });
+  }
+  
+  private processQueue() {
+    if (this.activeRequests < this.maxConcurrentRequests && this.queue.length > 0) {
+      const nextRequest = this.queue.shift();
+      if (nextRequest) {
+        nextRequest();
+      }
+    }
+  }
+}
+
+// Global request queue instance
+const requestQueue = new RequestQueue();
+
 /**
  * Helper function to get settings with fallback to process.env
  */
@@ -204,7 +243,7 @@ async function handleRateLimitError(error: Error, retryFn: () => Promise<unknown
 }
 
 /**
- * Generate text using AkashChat API with optimized handling
+ * Generate text using AkashChat API with optimized handling and request queuing
  */
 async function generateAkashChatText(
   akashchat: ReturnType<typeof createOpenAI>,
@@ -219,56 +258,60 @@ async function generateAkashChatText(
     stopSequences: string[];
   }
 ) {
-  try {
-    const { text } = await generateText({
-      model: akashchat.languageModel(model),
-      prompt: params.prompt,
-      system: params.system,
-      temperature: params.temperature,
-      maxTokens: params.maxTokens,
-      frequencyPenalty: params.frequencyPenalty,
-      presencePenalty: params.presencePenalty,
-      stopSequences: params.stopSequences,
-    });
-    return text;
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('Rate limit')) {
-      return handleRateLimitError(error, () => 
-        generateAkashChatText(akashchat, model, params)
-      ) as Promise<string>;
+  return requestQueue.enqueue(async () => {
+    try {
+      const { text } = await generateText({
+        model: akashchat.languageModel(model),
+        prompt: params.prompt,
+        system: params.system,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        frequencyPenalty: params.frequencyPenalty,
+        presencePenalty: params.presencePenalty,
+        stopSequences: params.stopSequences,
+      });
+      return text;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('Rate limit')) {
+        return handleRateLimitError(error, () => 
+          generateAkashChatText(akashchat, model, params)
+        ) as Promise<string>;
+      }
+      
+      logger.error('Error generating text:', error);
+      return 'Error generating text. Please try again later.';
     }
-    
-    logger.error('Error generating text:', error);
-    return 'Error generating text. Please try again later.';
-  }
+  });
 }
 
 /**
- * Generate object using AkashChat API with optimized handling
+ * Generate object using AkashChat API with optimized handling and request queuing
  */
 async function generateAkashChatObject(
   akashchat: ReturnType<typeof createOpenAI>,
   model: string,
   params: ObjectGenerationParams
 ) {
-  try {
-    const { object } = await generateObject({
-      model: akashchat.languageModel(model),
-      output: params.schema as any || 'no-schema',
-      prompt: params.prompt,
-      temperature: params.temperature,
-    });
-    return object;
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('Rate limit')) {
-      return handleRateLimitError(error, () => 
-        generateAkashChatObject(akashchat, model, params)
-      );
+  return requestQueue.enqueue(async () => {
+    try {
+      const { object } = await generateObject({
+        model: akashchat.languageModel(model),
+        output: params.schema as any || 'no-schema',
+        prompt: params.prompt,
+        temperature: params.temperature,
+      });
+      return object;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('Rate limit')) {
+        return handleRateLimitError(error, () => 
+          generateAkashChatObject(akashchat, model, params)
+        );
+      }
+      
+      logger.error('Error generating object:', error);
+      return {};
     }
-    
-    logger.error('Error generating object:', error);
-    return {};
-  }
+  });
 }
 
 export const akashchatPlugin: Plugin = {
@@ -358,16 +401,18 @@ export const akashchatPlugin: Plugin = {
       
       try {
         const baseURL = getBaseURL();
-        const response = await fetch(`${baseURL}/embeddings`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${getApiKey(runtime)}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: getSetting(runtime, 'AKASHCHAT_EMBEDDING_MODEL', 'BAAI-bge-large-en-v1-5'),
-            input: text,
-          }),
+        const response = await requestQueue.enqueue(async () => {
+          return fetch(`${baseURL}/embeddings`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${getApiKey(runtime)}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: getSetting(runtime, 'AKASHCHAT_EMBEDDING_MODEL', 'BAAI-bge-large-en-v1-5'),
+              input: text,
+            }),
+          });
         });
         
         if (!response.ok) {
