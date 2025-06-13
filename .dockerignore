@@ -101,3 +101,4 @@ package-lock.json
 .__MACOSX
 .Spotlight-V100
 .Trashes
+deploy.yaml
