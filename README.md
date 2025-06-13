@@ -18,7 +18,106 @@ Navi-Akash is an intelligent developer support agent for Akash Network that live
 - 🎵 **Voice Support**: Can join voice channels for assistance
 - 📎 **Media Handling**: Can process attachments and transcribe media
 - 🧠 **Akash Chat API**: Uses Akash's own AI infrastructure for responses
+- 🏗️ **SDL Builder**: Advanced SDL template generation and validation for Akash deployments
 - Built-in documentation and examples
+
+---
+
+## 🏗️ SDL Builder Plugin
+
+The **plugin-sdl-builder** is a powerful tool for generating and validating Akash Network deployment manifests (SDL files). It automates the complex process of creating deployment configurations.
+
+### ✨ SDL Builder Features
+
+🚀 **Smart SDL Generation**
+- Automatic template selection based on deployment type
+- Resource optimization suggestions
+- Cost estimation and comparisons
+
+🔍 **Advanced Validation**  
+- Structure validation with detailed error reporting
+- Performance optimization suggestions
+- Security best practices recommendations
+
+📋 **Template Library**
+- Web applications (basic, intermediate, advanced)
+- AI/ML deployments with GPU support
+- Blockchain nodes and ElizaOS agents
+- Database deployments (PostgreSQL, MySQL, Redis)
+- Gaming servers and media streaming
+- Enterprise microservices
+
+💰 **Cost Optimization**
+- Real-time pricing estimates
+- Provider comparison
+- Resource allocation optimization
+
+### 🎯 How to Use SDL Builder
+
+Simply ask Navi to create deployments using natural language:
+
+```
+"Create an SDL for a React web app with 2GB RAM"
+"Generate AI deployment with GPU for PyTorch"
+"Make a PostgreSQL database deployment"
+"Create an advanced ElizaOS agent deployment"
+"Build a gaming server with high CPU"
+```
+
+### 📝 Example SDL Generation
+
+**User Request:**
+```
+"I need an advanced AI deployment with GPU support for a machine learning model"
+```
+
+**Navi Response:**
+```yaml
+# Generated SDL with optimized GPU configuration
+version: "2.0"
+services:
+  ai-model:
+    image: pytorch/pytorch:latest
+    expose:
+      - port: 8080
+        as: 80
+        to:
+          - global: true
+    env:
+      - NVIDIA_VISIBLE_DEVICES=all
+profiles:
+  compute:
+    ai-model:
+      resources:
+        cpu:
+          units: 4
+        memory:
+          size: 8Gi
+        gpu:
+          units: 1
+          attributes:
+            vendor:
+              nvidia:
+                - model: rtx4090
+        storage:
+          - size: 50Gi
+```
+
+### 🔧 SDL Validation
+
+Navi can also validate existing SDL files:
+
+```
+"Validate this SDL" (attach your SDL file)
+"Check my deployment configuration"
+"Optimize this SDL for cost"
+```
+
+The plugin will provide:
+- ✅ Validation results
+- 💡 Optimization suggestions  
+- 💰 Cost estimates
+- 🔒 Security recommendations
 
 ---
 
@@ -31,6 +130,7 @@ Navi-Akash is an intelligent developer support agent for Akash Network that live
   - **plugin-discord**: Manages Discord integration
   - **plugin-knowledge**: Provides knowledge base functionality
   - **plugin-web-search**: Enables web search capabilities
+  - **plugin-sdl-builder**: Advanced SDL template generation and validation
 
 ---
 
@@ -207,7 +307,8 @@ navi-akash/
 │   ├── plugin-akash-chat/    # Akash Network functionality
 │   ├── plugin-discord/       # Discord integration
 │   ├── plugin-knowledge/     # Knowledge base
-│   └── plugin-web-search/    # Web search capabilities
+│   ├── plugin-web-search/    # Web search capabilities
+│   └── plugin-sdl-builder/   # SDL template generation and validation
 ├── src/                      # Main application code
 │   ├── index.ts              # Main entry point
 │   ├── plugin.ts             # Plugin configuration
@@ -287,7 +388,26 @@ See `.env.example` for a complete template.
 
 ## 📄 Akash SDL Deployment Example
 
-To deploy Navi-Akash on Akash Network, use the following SDL file (`deploy.yaml`):
+To deploy Navi-Akash on Akash Network, you can either:
+
+1. **Use the pre-built SDL template** (`deploy.yaml`) provided in this repository
+2. **Ask Navi to generate a custom SDL** using the SDL Builder plugin
+
+### 🏗️ Generate SDL with Navi
+
+Simply ask Navi to create an SDL for your specific needs:
+
+```
+"Create an SDL for a Discord bot with 2GB RAM and web search capabilities"
+"Generate a deployment for an AI agent with GPU support"
+"Make an optimized SDL for a chat bot with minimal resources"
+```
+
+Navi will generate a complete SDL file with proper resource allocation, security settings, and cost optimization.
+
+### 📋 Pre-built SDL Template
+
+Use the provided SDL file (`deploy.yaml`):
 
 ```yaml
 ---
