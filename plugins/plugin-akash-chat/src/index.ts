@@ -281,10 +281,15 @@ export const akashchatPlugin: Plugin = {
     AKASH_CHAT_LARGE_MODEL: process.env.AKASH_CHAT_LARGE_MODEL || 'Meta-Llama-3-3-70B-Instruct',
     AKASHCHAT_EMBEDDING_MODEL: process.env.AKASHCHAT_EMBEDDING_MODEL || 'BAAI-bge-large-en-v1-5',
     AKASHCHAT_EMBEDDING_DIMENSIONS: process.env.AKASHCHAT_EMBEDDING_DIMENSIONS || '1024',
+    ENABLE_DOCUMENT_CACHING: process.env.ENABLE_DOCUMENT_CACHING || 'true',
+    CACHE_OPTIMIZATION: process.env.CACHE_OPTIMIZATION || 'true',
   },
   
   async init(config: Record<string, string>, runtime: any) {
     const apiKey = getApiKey(runtime);
+    console.log('DEBUG: Akash Chat API Key from runtime:', apiKey);
+    console.log('DEBUG: Process env AKASH_CHAT_API_KEY:', process.env.AKASH_CHAT_API_KEY);
+    console.log('DEBUG: Runtime getSetting AKASH_CHAT_API_KEY:', runtime.getSetting('AKASH_CHAT_API_KEY'));
     if (!apiKey) {
       throw Error('Missing AKASH_CHAT_API_KEY in environment variables or settings');
     }

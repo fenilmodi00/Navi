@@ -148,6 +148,51 @@ const AKASH_SPECIAL_TOPICS = {
                 description: "Step-by-step guide for setting up and running an Akash validator."
             }
         ]
+    },
+    "ambassador": {
+        name: "Akash Ambassador Program",
+        links: [
+            {
+                title: "Akash Community",
+                url: "https://akash.network/community/",
+                description: "Join the Akash community and learn about ambassador opportunities."
+            },
+            {
+                title: "Akash Discord Community",
+                url: "https://discord.gg/akash",
+                description: "Official Akash Discord server for community engagement and support."
+            },
+            {
+                title: "Akash Forum",
+                url: "https://forum.akash.network/",
+                description: "Official Akash community forum for discussions and governance."
+            },
+            {
+                title: "Akash GitHub Community",
+                url: "https://github.com/akash-network/community",
+                description: "Community guidelines, events, and contribution opportunities."
+            }
+        ]
+    },
+    "provider-earnings": {
+        name: "Provider Earnings & Setup",
+        links: [
+            {
+                title: "Provider Documentation",
+                url: "https://akash.network/docs/providers/",
+                description: "Complete guide to becoming an Akash provider including requirements and setup."
+            },
+            {
+                title: "Provider Economics",
+                url: "https://akash.network/docs/providers/provider-rewards/",
+                description: "Information about provider reward structures and economic considerations."
+            },
+            {
+                title: "Akash Community Discord",
+                url: "https://discord.gg/akash",
+                description: "Join the provider community for real-world earnings discussions and support."
+            }
+        ]
     }
 };
 
@@ -190,7 +235,24 @@ const isRecentUpdatesQuery = (query: string): boolean => {
 const getSpecialTopicFromQuery = (query: string): {name: string, links: any[]} | null => {
     const queryLower = query.toLowerCase();
     
-    // Special cases for common synonyms and related terms
+    // Check if this is an AKT token price query - these should use web search
+    const isAKTTokenPriceQuery = (
+        (queryLower.includes("akt") && queryLower.includes("price")) ||
+        (queryLower.includes("akt") && queryLower.includes("cost")) ||
+        (queryLower.includes("token") && queryLower.includes("price")) ||
+        queryLower.includes("current") || queryLower.includes("live") || 
+        queryLower.includes("now") || queryLower.includes("today") ||
+        queryLower.includes("usd") || queryLower.includes("dollar") ||
+        queryLower.includes("market") || queryLower.includes("trading") ||
+        queryLower.includes("exchange") || queryLower.includes("coinbase")
+    );
+    
+    // If this is an AKT token price query, return null to allow web search
+    if (isAKTTokenPriceQuery) {
+        return null;
+    }
+    
+    // Special cases for common synonyms and related terms (Akash Network service pricing)
     if (queryLower.includes("cost") || queryLower.includes("price") || 
         queryLower.includes("expensive") || queryLower.includes("cheap") ||
         queryLower.includes("budget") || queryLower.includes("fee")) {
@@ -214,6 +276,20 @@ const getSpecialTopicFromQuery = (query: string): {name: string, links: any[]} |
         queryLower.includes("validator node") || queryLower.includes("staking") ||
         queryLower.includes("validate")) {
         return AKASH_SPECIAL_TOPICS["validator"];
+    }
+    
+    if (queryLower.includes("ambassador") || queryLower.includes("insider") || 
+        queryLower.includes("community program") || queryLower.includes("community member") ||
+        queryLower.includes("contribute") || queryLower.includes("discord") ||
+        queryLower.includes("forum")) {
+        return AKASH_SPECIAL_TOPICS["ambassador"];
+    }
+    
+    if (queryLower.includes("earnings") || queryLower.includes("provider earnings") || 
+        queryLower.includes("how much earn") || queryLower.includes("provider income") ||
+        queryLower.includes("provider revenue") || queryLower.includes("profitability") ||
+        queryLower.includes("provider rewards") || (queryLower.includes("earn") && queryLower.includes("provider"))) {
+        return AKASH_SPECIAL_TOPICS["provider-earnings"];
     }
     
     // Standard matching against topics
@@ -261,129 +337,69 @@ export class WebSearchService extends Service implements IWebSearchService {
         query: string,
         options?: SearchOptions,
     ): Promise<SearchResponse> {
-        try {
-            // Check if this query is about a special topic
-            const specialTopic = getSpecialTopicFromQuery(query);
+        const timeout = parseInt(process.env.WEB_SEARCH_TIMEOUT || '20000'); // 20 second timeout
+        const maxResults = parseInt(process.env.WEB_SEARCH_MAX_RESULTS || '5'); // Increase results
+        
+        elizaLogger.log(`Starting web search for: "${query}"`);
+        elizaLogger.log(`Search settings - timeout: ${timeout}ms, maxResults: ${maxResults}`);
+        
+        // Check for special topics first
+        const specialTopic = getSpecialTopicFromQuery(query);
+        if (specialTopic) {
+            elizaLogger.log(`Found special topic for query "${query}":`, specialTopic.name);
             
-            // Enhance query with Akash-specific terms if needed
-            const enhancedQuery = enhanceAkashQuery(query);
-            elizaLogger.log(`Original query: "${query}" | Enhanced query: "${enhancedQuery}"`);
-            
-            // Check if this is a query about recent updates
-            const isUpdateQuery = isRecentUpdatesQuery(query);
-            
-            // First try searching with site-specific query for docs
-            const docsQuery = `site:docs.akash.network ${query}`;
-            elizaLogger.log(`Trying docs-specific search: "${docsQuery}"`);
-            
-            let docsResponse;
-            try {
-                docsResponse = await this.tavilyClient.search(docsQuery, {
-                    includeAnswer: options?.includeAnswer || true,
-                    maxResults: 3,
-                    topic: options?.type || "general",
-                    searchDepth: "advanced",
-                    includeImages: false,
-                    days: 30, // Expand to 30 days for documentation
-                });
-            } catch (error) {
-                elizaLogger.error("Docs-specific search failed:", error);
-                docsResponse = { results: [] };
-            }
-            
-            // If this is an update query, also do a Twitter-specific search
-            let twitterResponse = { results: [] };
-            if (isUpdateQuery) {
-                const twitterQuery = `site:twitter.com OR site:x.com akashnet_ ${query}`;
-                elizaLogger.log(`Trying Twitter-specific search: "${twitterQuery}"`);
-                
-                try {
-                    twitterResponse = await this.tavilyClient.search(twitterQuery, {
-                        includeAnswer: false,
-                        maxResults: 3,
-                        topic: "general",
-                        searchDepth: "advanced",
-                        includeImages: false,
-                        days: 7, // Last 7 days for social media
-                    });
-                } catch (error) {
-                    elizaLogger.error("Twitter-specific search failed:", error);
-                }
-            }
-            
-            // Now do a general search
-            const generalResponse = await this.tavilyClient.search(enhancedQuery, {
-                includeAnswer: options?.includeAnswer || true,
-                maxResults: options?.limit || 5,
-                topic: options?.type || "general",
-                searchDepth: options?.searchDepth || "advanced",
-                includeImages: options?.includeImages || false,
-                days: options?.days || 7,
-            });
-            
-            // Create special topic results if applicable
-            let specialTopicResults: any[] = [];
-            if (specialTopic) {
-                specialTopicResults = specialTopic.links.map(link => ({
-                    title: link.title,
-                    url: link.url,
-                    content: link.description,
-                    score: 1.0, // Give these results high score
-                    publishedDate: new Date().toISOString() // Current date since these are curated
-                }));
-            }
-            
-            // Combine and prioritize results
-            const combinedResults = this.combineAndPrioritizeResults(
-                specialTopicResults,
-                docsResponse.results || [],
-                twitterResponse.results || [],
-                generalResponse.results || [],
-                isUpdateQuery
-            );
-            
-            // For social media focused queries, provide a more tailored answer
-            let answer = generalResponse.answer || "";
-            
-            // If it's a special topic, enhance the answer
-            if (specialTopic) {
-                answer = `${answer}\n\nI've included official documentation links for ${specialTopic.name} below.`;
-            }
-            
-            // If it's an update query with Twitter results, enhance the answer
-            if (isUpdateQuery && twitterResponse.results && twitterResponse.results.length > 0) {
-                // Include Twitter info in the answer even without dates
-                const tweetCount = twitterResponse.results.length;
-                
-                // Find most recent topic if possible
-                const tweetContent = twitterResponse.results.map(result => result.content).join(" ");
-                
-                // Extract potential topics from the content
-                const topics = [
-                    "Akash Accelerate", "decentralized compute", "AI infrastructure", 
-                    "open-source AI", "Overclock Labs", "cloud computing",
-                    "GPU", "deployment", "Akash provider"
-                ];
-                
-                const foundTopics = topics.filter(topic => 
-                    tweetContent.toLowerCase().includes(topic.toLowerCase())
-                );
-                
-                if (foundTopics.length > 0) {
-                    answer += `\n\nRecent Twitter updates from the official Akash Network account discuss ${foundTopics.slice(0, 3).join(", ")}.`;
-                } else {
-                    answer += "\n\nRecent Twitter updates from the official Akash Network account are included in the results below.";
-                }
-            }
+            // Return special topic links as search results
+            const specialResults = specialTopic.links.map(link => ({
+                title: link.title,
+                url: link.url,
+                content: link.description,
+                publishedDate: undefined,
+                score: 1.0
+            }));
             
             return {
-                ...generalResponse,
-                answer,
-                results: combinedResults
+                results: specialResults,
+                answer: `Here are the official resources for ${specialTopic.name}:`,
+                query: query,
+                responseTime: 0,
+                images: []
             };
+        }
+        
+        try {
+            elizaLogger.log(`Performing Tavily search for: "${query}"`);
+            
+            // Simplified search - just do one search with timeout
+            const searchPromise = this.tavilyClient.search(query, {
+                includeAnswer: options?.includeAnswer || true,
+                maxResults: maxResults,
+                topic: options?.type || "general",
+                searchDepth: "basic", // Use basic instead of advanced for speed
+                includeImages: false,
+                days: 7,
+            });
+            
+            // Create timeout promise
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Web search timeout')), timeout);
+            });
+            
+            // Race between search and timeout
+            const response = await Promise.race([searchPromise, timeoutPromise]);
+            
+            elizaLogger.log(`Web search completed successfully with ${response.results?.length || 0} results`);
+            
+            return response;
         } catch (error) {
-            elizaLogger.error("Web search error:", error);
-            throw error;
+            elizaLogger.error("Web search failed:", error);
+            // Return a fallback response
+            return {
+                results: [],
+                answer: `I couldn't search for current information about "${query}" right now. For the latest AKT price, you can check CoinGecko, CoinMarketCap, or your preferred crypto exchange. Is there anything about Akash Network deployments I can help you with instead?`,
+                query: query,
+                responseTime: 0,
+                images: []
+            };
         }
     }
     

@@ -529,10 +529,16 @@ async function generateContextsInBatch(
   // Get active provider from validateModelConfig
   const config = validateModelConfig();
   const isUsingOpenRouter = config.TEXT_PROVIDER === "openrouter";
+  const isUsingAkashChat = (config.TEXT_PROVIDER === "openai" && config.OPENAI_BASE_URL?.includes("chatapi.akash.network")) ||
+                          config.TEXT_PROVIDER === "akash";
   const isUsingCacheCapableModel =
-    isUsingOpenRouter &&
-    (config.TEXT_MODEL?.toLowerCase().includes("claude") ||
-      config.TEXT_MODEL?.toLowerCase().includes("gemini"));
+    (isUsingOpenRouter &&
+      (config.TEXT_MODEL?.toLowerCase().includes("claude") ||
+       config.TEXT_MODEL?.toLowerCase().includes("gemini"))) ||
+    (isUsingAkashChat &&
+      (config.TEXT_MODEL?.toLowerCase().includes("deepseek") ||
+       config.TEXT_MODEL?.toLowerCase().includes("llama") ||
+       config.TEXT_MODEL?.toLowerCase().includes("qwen")));
 
   logger.info(
     `Using provider: ${config.TEXT_PROVIDER}, model: ${config.TEXT_MODEL}, caching capability: ${isUsingCacheCapableModel}`
@@ -588,7 +594,7 @@ async function generateContextsInBatch(
           `context generation for chunk ${item.originalIndex}`
         );
 
-        const generatedContext = llmResponse.text;
+        const generatedContext = llmResponse;
         const contextualizedText = getChunkWithContext(
           item.chunkText,
           generatedContext

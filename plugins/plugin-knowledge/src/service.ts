@@ -49,19 +49,29 @@ export class KnowledgeService extends Service {
       return false; // Default to false if undefined or other type
     };
 
+    // Read configuration from runtime settings, with fallbacks to environment variables
+    const ctxKnowledgeEnabled = config?.CTX_KNOWLEDGE_ENABLED ?? 
+      runtime.getSetting('CTX_KNOWLEDGE_ENABLED') ?? 
+      process.env.CTX_KNOWLEDGE_ENABLED ?? 'true';
+    
+    const loadDocsOnStartup = config?.LOAD_DOCS_ON_STARTUP ?? 
+      runtime.getSetting('LOAD_DOCS_ON_STARTUP') ?? 
+      process.env.LOAD_DOCS_ON_STARTUP ?? 'true';
+
     this.config = {
-      CTX_KNOWLEDGE_ENABLED: parseBooleanEnv(config?.CTX_KNOWLEDGE_ENABLED),
-      LOAD_DOCS_ON_STARTUP: parseBooleanEnv(config?.LOAD_DOCS_ON_STARTUP),
-      MAX_INPUT_TOKENS: config?.MAX_INPUT_TOKENS,
-      MAX_OUTPUT_TOKENS: config?.MAX_OUTPUT_TOKENS,
-      EMBEDDING_PROVIDER: config?.EMBEDDING_PROVIDER,
-      TEXT_PROVIDER: config?.TEXT_PROVIDER,
-      TEXT_EMBEDDING_MODEL: config?.TEXT_EMBEDDING_MODEL,
+      CTX_KNOWLEDGE_ENABLED: parseBooleanEnv(ctxKnowledgeEnabled),
+      LOAD_DOCS_ON_STARTUP: parseBooleanEnv(loadDocsOnStartup),
+      MAX_INPUT_TOKENS: config?.MAX_INPUT_TOKENS ?? runtime.getSetting('MAX_INPUT_TOKENS'),
+      MAX_OUTPUT_TOKENS: config?.MAX_OUTPUT_TOKENS ?? runtime.getSetting('MAX_OUTPUT_TOKENS'),
+      EMBEDDING_PROVIDER: config?.EMBEDDING_PROVIDER ?? runtime.getSetting('EMBEDDING_PROVIDER'),
+      TEXT_PROVIDER: config?.TEXT_PROVIDER ?? runtime.getSetting('TEXT_PROVIDER'),
+      TEXT_EMBEDDING_MODEL: config?.TEXT_EMBEDDING_MODEL ?? runtime.getSetting('TEXT_EMBEDDING_MODEL'),
     };
 
     logger.info(
-      `KnowledgeService initialized for agent ${this.runtime.agentId} with config:`,
-      this.config
+      `KnowledgeService initialized for agent ${this.runtime.agentId} with config:
+    CTX_KNOWLEDGE_ENABLED: ${this.config.CTX_KNOWLEDGE_ENABLED}
+    LOAD_DOCS_ON_STARTUP: ${this.config.LOAD_DOCS_ON_STARTUP}`
     );
 
     if (this.config.LOAD_DOCS_ON_STARTUP) {

@@ -188,6 +188,9 @@ function validateConfigRequirements(config: ModelConfig, assumePluginOpenAI: boo
     if (config.TEXT_PROVIDER === 'google' && !config.GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY is required when TEXT_PROVIDER is set to "google"');
     }
+    if (config.TEXT_PROVIDER === 'akash' && !config.AKASH_CHAT_API_KEY) {
+      throw new Error('AKASH_CHAT_API_KEY is required when TEXT_PROVIDER is set to "akash"');
+    }
 
     // If using OpenRouter with Claude or Gemini models, check for additional recommended configurations
     if (config.TEXT_PROVIDER === 'openrouter') {
@@ -195,6 +198,26 @@ function validateConfigRequirements(config: ModelConfig, assumePluginOpenAI: boo
       if (modelName.includes('claude') || modelName.includes('gemini')) {
         logger.info(
           `Using ${modelName} with OpenRouter. This configuration supports document caching for improved performance.`
+        );
+      }
+    }
+    
+    // If using Akash Chat API, enable caching for supported models
+    if (config.TEXT_PROVIDER === 'openai' && config.OPENAI_BASE_URL?.includes('chatapi.akash.network')) {
+      const modelName = config.TEXT_MODEL?.toLowerCase() || '';
+      if (modelName.includes('deepseek') || modelName.includes('llama') || modelName.includes('qwen')) {
+        logger.info(
+          `Using ${modelName} with Akash Chat API. This configuration supports document caching for improved performance.`
+        );
+      }
+    }
+    
+    // If using akash text provider directly
+    if (config.TEXT_PROVIDER === 'akash') {
+      const modelName = config.TEXT_MODEL?.toLowerCase() || '';
+      if (modelName.includes('deepseek') || modelName.includes('llama') || modelName.includes('qwen')) {
+        logger.info(
+          `Using ${modelName} with Akash Chat API. This configuration supports document caching for improved performance.`
         );
       }
     }
@@ -256,9 +279,9 @@ export async function getProviderRateLimits(runtime?: IAgentRuntime): Promise<Pr
     case 'akash':
       // Akash Chat API rate limits - using more aggressive defaults
       return {
-        maxConcurrentRequests: Math.min(maxConcurrentRequests, 50),
-        requestsPerMinute: Math.min(requestsPerMinute, 300),
-        tokensPerMinute: Math.min(tokensPerMinute, 200000),
+        maxConcurrentRequests: Math.min(maxConcurrentRequests, 100),
+        requestsPerMinute: Math.min(requestsPerMinute, 500),
+        tokensPerMinute: Math.min(tokensPerMinute, 500000),
         provider: 'akash',
       };
 

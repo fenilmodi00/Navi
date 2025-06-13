@@ -69,7 +69,17 @@ const isSpecialTopicURL = (url: string): boolean => {
         
         // Validator
         'akash.network/docs/validators/',
-        'akash.network/docs/validators/validator-deployment-guide/'
+        'akash.network/docs/validators/validator-deployment-guide/',
+        
+        // Ambassador/Community
+        'akash.network/community/',
+        'discord.gg/akash',
+        'forum.akash.network/',
+        'github.com/akash-network/community',
+        
+        // Provider Earnings
+        'akash.network/docs/providers/',
+        'akash.network/docs/providers/provider-rewards/'
     ];
     return specialURLs.some(specialURL => url.includes(specialURL));
 };
@@ -169,8 +179,29 @@ export const webSearch: Action = {
     // eslint-disable-next-line
     validate: async (runtime: IAgentRuntime, message: Memory) => {
         const tavilyApiKeyOk = !!runtime.getSetting("TAVILY_API_KEY");
-
-        return tavilyApiKeyOk;
+        
+        if (!tavilyApiKeyOk) {
+            return false;
+        }
+        
+        // Check if message content should trigger web search
+        const text = message.content.text?.toLowerCase() || '';
+        const webSearchTriggers = [
+            'latest', 'recent', 'news', 'update', 'announcement', 'today', 
+            'this week', 'this month', 'roadmap', 'upcoming', 'release', 
+            'social media', 'twitter', 'discord announcement', 'blog post',
+            'new feature', 'just released', 'yesterday', 'current', 'now',
+            'what is happening', 'what happened', 'status', 'progress',
+            'development', 'launched', 'launching', 'released', 'deployed',
+            // Add price-related triggers for real-time data
+            'price', 'cost', 'current price', 'today price', 'coinbase', 'exchange',
+            'trading', 'market', 'value', 'worth', 'usd', 'dollar',
+            // Add bridging and transfer related triggers
+            'bridge', 'bridging', 'transfer', 'move tokens', 'send tokens',
+            'ibc', 'cross-chain', 'osmosis', 'cosmos', 'keplr', 'withdraw', 'deposit'
+        ];
+        
+        return webSearchTriggers.some(trigger => text.includes(trigger));
     },
     handler: async (
         runtime: IAgentRuntime,
