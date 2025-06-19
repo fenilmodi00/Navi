@@ -90,9 +90,6 @@ export const character: Character = {
   name: "Navi",
   username: "AkashNavi",
   plugins: [
-    "@elizaos/plugin-sql",
-    // "@elizaos/adapter-postgres",
-    // "@elizaos-plugins/adapter-supabase",
     "@elizaos/plugin-bootstrap", 
     "@elizaos/plugin-akash-chat",
     "@elizaos/plugin-discord",
@@ -121,7 +118,13 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
     AKASH_CHAT_LARGE_MODEL: process.env.AKASH_CHAT_LARGE_MODEL || "Meta-Llama-3-2-3B-Instruct",
     AKASH_CHAT_BASE_URL: "https://chatapi.akash.network/api/v1",
 
-    POSTGRES_URL: process.env.POSTGRES_URL,
+    // PostgreSQL/Supabase configuration
+    POSTGRES_URL: process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL,
+    DATABASE_URL: process.env.DATABASE_URL || process.env.SUPABASE_DB_URL,
+
+    // Supabase configuration
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
 
     // Web Search plugin configuration
     TAVILY_API_KEY: process.env.TAVILY_API_KEY,
@@ -139,38 +142,35 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
     DOCS_REPO_1_BRANCH: process.env.DOCS_REPO_1_BRANCH,
     DOCS_REPO_1_DOCS_PATH: process.env.DOCS_REPO_1_DOCS_PATH,
 
-    // Performance optimization for faster responses
-    MAX_CONCURRENT_REQUESTS: "50",
-    REQUESTS_PER_MINUTE: "300",
-    TOKENS_PER_MINUTE: "200000",
-    MAX_INPUT_TOKENS: "2000",
-    MAX_OUTPUT_TOKENS: "1500",
-    RESPONSE_TIMEOUT: "30000",
-    MAX_RESPONSE_TIME: "30000",
+    // Performance optimization for Akash deployment
+    MAX_CONCURRENT_REQUESTS: "10",
+    REQUESTS_PER_MINUTE: "60",
+    TOKENS_PER_MINUTE: "50000",
+    MAX_INPUT_TOKENS: "1000",
+    MAX_OUTPUT_TOKENS: "800",
+    RESPONSE_TIMEOUT: "15000",
+    MAX_RESPONSE_TIME: "15000",
 
-    // Fast response settings
+    // Fast response settings for Akash
     RESPONSE_STREAMING: "true",
     QUICK_RESPONSE_MODE: "true",
-    KNOWLEDGE_SEARCH_LIMIT: "50",
+    KNOWLEDGE_SEARCH_LIMIT: "10",
 
     // Discord plugin configuration
     DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID,
     DISCORD_API_TOKEN: process.env.DISCORD_API_TOKEN,
 
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
-
-    // Model configuration
-    MODEL_TEMPERATURE: "0.3",
-    MODEL_MAX_TOKENS: "3000",
+    // Model configuration for Akash optimization
+    MODEL_TEMPERATURE: "0.7",
+    MODEL_MAX_TOKENS: "1200",
     MODEL_TOP_P: "0.9",
-    MODEL_FREQUENCY_PENALTY: "0.1",
+    MODEL_FREQUENCY_PENALTY: "0.2",
 
-    // Cache settings
+    // Cache settings optimized for Akash
     KNOWLEDGE_CACHE_ENABLED: "true",
-    KNOWLEDGE_CACHE_TTL: "7200",
+    KNOWLEDGE_CACHE_TTL: "3600",
     RESPONSE_CACHE_ENABLED: "true",
-    QUICK_RESPONSE_THRESHOLD: "10",
+    QUICK_RESPONSE_THRESHOLD: "5",
   },
   system: `You are Navi, a Discord-based developer support agent for Akash Network with **ADVANCED SDL GENERATION CAPABILITIES**. Your primary focus is to assist developers with cloud deployment and provide expert guidance on the Akash ecosystem.
 
