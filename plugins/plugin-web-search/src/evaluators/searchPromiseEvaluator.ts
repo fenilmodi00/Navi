@@ -11,6 +11,46 @@ import { WebSearchService } from "../services/webSearchService";
  * Determines if a query requires real-time information that isn't available in the knowledge base
  */
 export function requiresRealTimeSearch(query: string): boolean {
+    // Only search when explicitly asked
+    const explicitSearchRequests = [
+        'search for', 
+        'search the web', 
+        'do a web search',
+        'look up',
+        'find online',
+        'what is the current',
+        'what are the latest',
+        'find me the latest',
+        'find the most recent'
+    ];
+    
+    // If user explicitly asks for a search, do it
+    const isExplicitSearchRequest = explicitSearchRequests.some(phrase => 
+        query.toLowerCase().includes(phrase)
+    );
+    
+    if (isExplicitSearchRequest) {
+        return true;
+    }
+    
+    // Skip web search for Akash Accelerate event questions since we have this in the system prompt
+    if (query.toLowerCase().includes('akash accelerate') && 
+        (query.toLowerCase().includes('when') || 
+         query.toLowerCase().includes('date') || 
+         query.toLowerCase().includes('happening') || 
+         query.toLowerCase().includes('schedule'))) {
+        return false;
+    }
+
+    // Skip search for most standard questions - rely on embedded knowledge
+    if (!query.toLowerCase().includes('current') && 
+        !query.toLowerCase().includes('latest') && 
+        !query.toLowerCase().includes('recent') &&
+        !query.toLowerCase().includes('today') &&
+        !query.toLowerCase().includes('now')) {
+        return false;
+    }
+    
     // Real-time price/market data queries
     const priceQueries = [
         'current price', 'akt price', 'token price', 'price today', 'market cap',
