@@ -8,9 +8,18 @@ import { logger } from '@elizaos/core';
 import { validateModelConfig, getKnowledgeConfig } from './config';
 import { KnowledgeService } from './service';
 import { knowledgeProvider } from './provider';
-import knowledgeTestSuite from './tests';
 import { knowledgeActions } from './actions';
 import { knowledgeRoutes } from './routes';
+
+// Conditionally import tests only in development
+let knowledgeTestSuite: any = null;
+try {
+  if (process.env.NODE_ENV !== 'production') {
+    knowledgeTestSuite = require('./tests').default;
+  }
+} catch (error) {
+  // Tests not available in production build
+}
 
 /**
  * Knowledge Plugin - Provides Retrieval Augmented Generation capabilities
@@ -106,7 +115,7 @@ export const knowledgePlugin: Plugin = {
   providers: [knowledgeProvider],
   routes: knowledgeRoutes,
   actions: knowledgeActions,
-  tests: [knowledgeTestSuite],
+  tests: knowledgeTestSuite ? [knowledgeTestSuite] : [],
 };
 
 export default knowledgePlugin;

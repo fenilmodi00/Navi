@@ -30,10 +30,15 @@ COPY tsconfig.json tsup.config.ts ./
 COPY src ./src
 COPY plugins ./plugins
 
+
 # Install dependencies (after workspace plugins are available)
 RUN bun install
 
-# Build the project
+# Build all workspace plugins first
+
+RUN cd plugins/plugin-web-search && bun run build
+
+# Build the main project 
 RUN bun run build
 
 # Clean up build artifacts and dev dependencies
@@ -69,8 +74,9 @@ COPY --from=builder /app/plugins ./plugins
 # Create necessary directories for ElizaOS
 RUN mkdir -p data .eliza
 
-# Set environment to production
+# Set environment to production and disable plugin auto-installation
 ENV NODE_ENV=production
+ENV ELIZA_AUTO_INSTALL_PLUGINS=false
 
 # Expose default ports
 EXPOSE 3000

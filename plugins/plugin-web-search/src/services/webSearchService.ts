@@ -477,37 +477,59 @@ export class WebSearchService extends Service implements IWebSearchService {
     }
 
     /**
-     * Optimize search query for better web search results
-     * Extracts key terms and makes queries more suitable for search APIs
+     * Enhanced query optimization with knowledge base awareness
+     * Optimizes queries specifically for time-sensitive web searches
      */
     private optimizeSearchQuery(query: string): string {
-        elizaLogger.log(`Original query length: ${query.length} characters`);
+        elizaLogger.log(`Optimizing web search query: "${query}"`);
         
         // Remove excessive whitespace and normalize
         let optimized = query.replace(/\s+/g, ' ').trim();
         
-        // If query is too long (over 200 chars), extract key terms
-        if (optimized.length > 200) {
-            elizaLogger.log("Query too long, extracting key terms...");
-            
-            // Extract key Akash-related terms
-            const akashKeywords = this.extractAkashKeywords(optimized);
-            
-            // Extract important technical terms
-            const techKeywords = this.extractTechnicalKeywords(optimized);
-            
-            // Combine and create optimized query
-            const keywords = [...akashKeywords, ...techKeywords].slice(0, 8); // Limit to 8 keywords
-            optimized = keywords.join(' ');
-            
-            elizaLogger.log(`Optimized query (${optimized.length} chars): "${optimized}"`);
-        }
+        // Detect query intent and optimize accordingly
+        const queryLower = optimized.toLowerCase();
         
-        // Always add "Akash Network" context if not present
-        if (!optimized.toLowerCase().includes('akash')) {
+        // Price/market queries - add specific market terms
+        if (queryLower.includes('price') || queryLower.includes('cost') || queryLower.includes('akt')) {
+            if (queryLower.includes('akt') && (queryLower.includes('price') || queryLower.includes('cost'))) {
+                optimized = `AKT token price USD current market value`;
+            } else {
+                optimized = `Akash Network ${optimized} market price USD`;
+            }
+        }
+        // News/updates queries - add temporal context
+        else if (queryLower.includes('latest') || queryLower.includes('recent') || queryLower.includes('news')) {
+            optimized = `Akash Network ${optimized} 2024 2025`;
+        }
+        // Status queries - add network context
+        else if (queryLower.includes('status') || queryLower.includes('down') || queryLower.includes('working')) {
+            optimized = `Akash Network ${optimized} current status`;
+        }
+        // Social media queries - add platform context
+        else if (queryLower.includes('twitter') || queryLower.includes('social')) {
+            optimized = `Akash Network official twitter social media updates`;
+        }
+        // Provider queries - add real-time context
+        else if (queryLower.includes('provider') && (queryLower.includes('earnings') || queryLower.includes('rewards'))) {
+            optimized = `Akash Network provider earnings rewards current 2024`;
+        }
+        // Bridge/transfer queries - add current process context
+        else if (queryLower.includes('bridge') || queryLower.includes('transfer') || queryLower.includes('ibc')) {
+            optimized = `Akash AKT token bridge transfer IBC osmosis cosmos current guide`;
+        }
+        // Generic optimization - add Akash context if missing
+        else if (!queryLower.includes('akash')) {
             optimized = `Akash Network ${optimized}`;
         }
         
+        // Limit query length to improve search performance
+        if (optimized.length > 150) {
+            // Extract most important terms
+            const terms = optimized.split(' ').filter(term => term.length > 2);
+            optimized = terms.slice(0, 12).join(' ');
+        }
+        
+        elizaLogger.log(`Optimized query: "${optimized}"`);
         return optimized;
     }
 

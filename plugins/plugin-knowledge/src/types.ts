@@ -170,6 +170,8 @@ export interface KnowledgeConfig {
   DOCS_REPO_1_BRANCH?: string;
   DOCS_REPO_1_DOCS_PATH?: string;
   // Add any other plugin-specific configurations
+  // Index signature to match Metadata interface
+  [key: string]: any;
 }
 
 export interface LoadResult {

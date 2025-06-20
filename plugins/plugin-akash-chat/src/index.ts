@@ -34,16 +34,23 @@ const clientCache = new Map<string, ReturnType<typeof createOpenAI>>();
 // Cache for tokenizers to avoid recreating them
 const tokenizerCache = new Map<string, any>();
 
-// Request queue to manage concurrent requests and respect rate limits
-class RequestQueue {
-  private queue: Array<() => Promise<any>> = [];
+// Request queue with priority support to manage concurrent requests and respect rate limits
+class PriorityRequestQueue {
+  private foregroundQueue: Array<() => Promise<any>> = []; // User chat requests (high priority)
+  private backgroundQueue: Array<() => Promise<any>> = []; // Knowledge processing requests (low priority)
   private activeRequests = 0;
-  private readonly maxConcurrentRequests = 8; // Increased from 2 for better throughput
+  private readonly maxConcurrentRequests = 2; // Reduced to 2 to stay well under API limit of 3
+  private readonly maxBackgroundRequests = 1; // Reserve at least 1 slot for foreground requests
+  private lastLogTime = 0; // For periodic queue status logging
   
-  async enqueue<T>(requestFn: () => Promise<T>): Promise<T> {
+  async enqueue<T>(requestFn: () => Promise<T>, priority: 'foreground' | 'background' = 'foreground'): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const wrappedRequest = async () => {
         this.activeRequests++;
+        
+        // Periodic logging when queue is busy
+        this.logQueueStatusIfNeeded();
+        
         try {
           const result = await requestFn();
           resolve(result);
@@ -55,23 +62,70 @@ class RequestQueue {
         }
       };
       
-      this.queue.push(wrappedRequest);
+      // Add to appropriate queue based on priority
+      if (priority === 'foreground') {
+        this.foregroundQueue.push(wrappedRequest);
+      } else {
+        this.backgroundQueue.push(wrappedRequest);
+      }
+      
       this.processQueue();
     });
   }
   
   private processQueue() {
-    if (this.activeRequests < this.maxConcurrentRequests && this.queue.length > 0) {
-      const nextRequest = this.queue.shift();
+    if (this.activeRequests >= this.maxConcurrentRequests) {
+      return; // All slots occupied
+    }
+    
+    // Always prioritize foreground requests
+    if (this.foregroundQueue.length > 0) {
+      const nextRequest = this.foregroundQueue.shift();
+      if (nextRequest) {
+        nextRequest();
+      }
+      return;
+    }
+    
+    // Process background requests only if we have available slots and don't exceed background limit
+    if (this.backgroundQueue.length > 0 && this.activeRequests < this.maxBackgroundRequests) {
+      const nextRequest = this.backgroundQueue.shift();
       if (nextRequest) {
         nextRequest();
       }
     }
   }
+  
+  private logQueueStatusIfNeeded() {
+    const now = Date.now();
+    const shouldLog = (
+      // Log every 30 seconds when there's queue activity
+      (now - this.lastLogTime > 30000) &&
+      // But only if there's something interesting to report
+      (this.foregroundQueue.length > 0 || this.backgroundQueue.length > 2 || this.activeRequests > 0)
+    );
+    
+    if (shouldLog) {
+      const status = this.getQueueStatus();
+      logger.info(`🔄 Akash Chat Queue Status: active=${status.activeRequests}, fg_queue=${status.foregroundQueue}, bg_queue=${status.backgroundQueue}`);
+      this.lastLogTime = now;
+    }
+  }
+  
+  // Method to get queue status for debugging
+  getQueueStatus() {
+    return {
+      activeRequests: this.activeRequests,
+      foregroundQueue: this.foregroundQueue.length,
+      backgroundQueue: this.backgroundQueue.length,
+      maxConcurrentRequests: this.maxConcurrentRequests,
+      maxBackgroundRequests: this.maxBackgroundRequests
+    };
+  }
 }
 
-// Global request queue instance
-const requestQueue = new RequestQueue();
+// Global priority request queue instance
+const requestQueue = new PriorityRequestQueue();
 
 /**
  * Helper function to get settings with fallback to process.env
@@ -244,6 +298,7 @@ async function handleRateLimitError(error: Error, retryFn: () => Promise<unknown
 
 /**
  * Generate text using AkashChat API with optimized handling and request queuing
+ * This is considered a foreground operation (user chat) and gets high priority
  */
 async function generateAkashChatText(
   akashchat: ReturnType<typeof createOpenAI>,
@@ -281,11 +336,12 @@ async function generateAkashChatText(
       logger.error('Error generating text:', error);
       return 'Error generating text. Please try again later.';
     }
-  });
+  }, 'foreground'); // High priority for user chat
 }
 
 /**
  * Generate object using AkashChat API with optimized handling and request queuing
+ * This is considered a foreground operation (user chat) and gets high priority
  */
 async function generateAkashChatObject(
   akashchat: ReturnType<typeof createOpenAI>,
@@ -311,7 +367,14 @@ async function generateAkashChatObject(
       logger.error('Error generating object:', error);
       return {};
     }
-  });
+  }, 'foreground'); // High priority for user chat
+}
+
+/**
+ * Get current queue status for monitoring and debugging
+ */
+export function getRequestQueueStatus() {
+  return requestQueue.getQueueStatus();
 }
 
 export const akashchatPlugin: Plugin = {
@@ -339,6 +402,9 @@ export const akashchatPlugin: Plugin = {
     
     // Pre-warm the client cache
     getAkashChatClient(runtime);
+    
+    // Log initial queue status
+    logger.info('✅ Akash Chat plugin initialized with priority request queue', requestQueue.getQueueStatus());
     
     // Validate API key
     try {
@@ -413,7 +479,7 @@ export const akashchatPlugin: Plugin = {
               input: text,
             }),
           });
-        });
+        }, 'background'); // Low priority for knowledge base processing
         
         if (!response.ok) {
           const errorVector = Array(embeddingDimension).fill(0);

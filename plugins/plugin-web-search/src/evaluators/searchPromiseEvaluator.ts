@@ -8,6 +8,98 @@ import {
 import { WebSearchService } from "../services/webSearchService";
 
 /**
+ * Determines if a query requires real-time information that isn't available in the knowledge base
+ */
+export function requiresRealTimeSearch(query: string): boolean {
+    // Real-time price/market data queries
+    const priceQueries = [
+        'current price', 'akt price', 'token price', 'price today', 'market cap',
+        'trading volume', 'price chart', 'latest price', 'current value'
+    ];
+    
+    // Real-time network statistics
+    const networkStatsQueries = [
+        'current provider', 'active provider', 'network stats', 'live stats',
+        'current earning', 'provider earning', 'providers earning', 'earning right now',
+        'network usage', 'active deployment', 'current deployment', 'network capacity', 
+        'provider reward', 'how much', 'earning', 'making money'
+    ];
+    
+    // Recent news and updates
+    const newsQueries = [
+        'latest news', 'recent update', 'announcement', 'new feature',
+        'latest version', 'recent development', 'what\'s new', 'news about',
+        'latest', 'recent'
+    ];
+    
+    // Current network status
+    const statusQueries = [
+        'network status', 'is akash down', 'network health', 'current issue',
+        'maintenance', 'network problem', 'akash down', 'is down', 'down'
+    ];
+    
+    // Live deployment costs (as they fluctuate)
+    const costQueries = [
+        'current cost', 'deployment cost', 'pricing calculator', 'cost calculator',
+        'current rate', 'provider rate'
+    ];
+    
+    const allRealTimeQueries = [
+        ...priceQueries,
+        ...networkStatsQueries, 
+        ...newsQueries,
+        ...statusQueries,
+        ...costQueries
+    ];
+    
+    // Check if query contains real-time information needs
+    const needsRealTime = allRealTimeQueries.some(keyword => query.includes(keyword));
+    
+    // Knowledge base topics that DON'T need web search
+    const knowledgeBaseTopics = [
+        'what is akash', 'how does akash work', 'akash architecture',
+        'deploy application', 'create deployment', 'setup provider',
+        'install akash', 'akash tutorial', 'akash guide', 'akash documentation',
+        'persistent storage', 'data storage', 'like google drive',
+        'akash vs', 'comparison', 'difference between',
+        'how to use', 'getting started', 'beginner guide',
+        'decentralized cloud', 'blockchain', 'container', 'kubernetes', 'docker'
+    ];
+    
+    // Strong indicators that definitely need web search (prioritize over knowledge base)
+    const definitelyNeedsWebSearch = [
+        'akt price', 'token price', 'current price', 'price today',
+        'provider earning', 'providers earning', 'earning right now',
+        'network down', 'is down', 'akash down',
+        'latest news', 'recent news', 'network news',
+        'network stats', 'live stats', 'current stats'
+    ];
+    
+    // If it definitely needs web search, do it regardless of knowledge base topics
+    const definitelyNeeds = definitelyNeedsWebSearch.some(keyword => query.includes(keyword));
+    if (definitelyNeeds) {
+        return true;
+    }
+    
+    // If it has real-time keywords but might be knowledge base topic
+    if (needsRealTime) {
+        const isKnowledgeBaseTopic = knowledgeBaseTopics.some(topic => query.includes(topic));
+        
+        // For knowledge base topics, only search if explicitly asking for "latest" updates/news
+        if (isKnowledgeBaseTopic) {
+            return query.includes('latest news') || query.includes('recent update') || 
+                   query.includes('latest update') || query.includes('what\'s new') ||
+                   (query.includes('latest') && query.includes('news'));
+        }
+        
+        // If not a knowledge base topic and has real-time keywords, search
+        return true;
+    }
+    
+    return false;
+}
+
+/**
  * This evaluator monitors agent responses and automatically executes
  * web searches when the agent promises to search for information
  */
@@ -30,7 +122,7 @@ export const searchPromiseEvaluator: Evaluator = {
         
         const text = message.content.text?.toLowerCase() || '';
         
-        // Check if the agent promised to search
+        // Check if the agent promised to search - be more restrictive to avoid false positives
         const searchPromises = [
             'searching now',
             'will search',
@@ -38,28 +130,86 @@ export const searchPromiseEvaluator: Evaluator = {
             'i\'ll search',
             'searching for',
             'web search',
-            'will share findings',
-            'i\'ll fetch',
             'via web search',
-            'searching',
-            'will find',
-            'looking up',
-            'let me pull',
-            'i\'ll pull',
-            'let me check',
-            'checking for',
-            'let me find',
-            'finding information',
             'getting the latest',
             'pulling fresh',
-            'will share results'
+            'will share findings'
         ];
         
         const hasPromise = searchPromises.some(promise => text.includes(promise));
         
-        elizaLogger.log(`Search promise evaluator: hasPromise=${hasPromise} for text: ${text}`);
+        if (!hasPromise) {
+            return false;
+        }
         
-        return hasPromise;
+        // Additional check: Don't trigger if the agent is already providing substantial knowledge-based content
+        const hasSubstantialContent = text.length > 200 && (
+            text.includes('akash network') || 
+            text.includes('deployment') || 
+            text.includes('provider') ||
+            text.includes('you can') ||
+            text.includes('to do this')
+        );
+        
+        if (hasSubstantialContent && !text.includes('latest') && !text.includes('current')) {
+            elizaLogger.log("Skipping search - agent already providing substantial knowledge-based response");
+            return false;
+        }
+        
+        if (!hasPromise) {
+            return false;
+        }
+        
+        // Get recent conversation context to understand what the user is asking about
+        const recentMessages = await runtime.getMemories({
+            roomId: message.roomId,
+            count: 10,
+            tableName: "messages"
+        });
+        
+        // Check if there's already a recent response from the agent to the same question
+        const recentAgentResponses = recentMessages.filter(msg => 
+            msg.entityId === runtime.agentId && 
+            msg.createdAt > Date.now() - 30000 // Within last 30 seconds
+        );
+        
+        if (recentAgentResponses.length > 1) {
+            elizaLogger.log("Skipping search - recent agent response already exists");
+            return false;
+        }
+        
+        // Find the most recent user question
+        let userQuestion = "";
+        for (let i = recentMessages.length - 1; i >= 0; i--) {
+            const mem = recentMessages[i];
+            if (mem.entityId !== runtime.agentId) {
+                userQuestion = mem.content.text?.toLowerCase() || '';
+                break;
+            }
+        }
+        
+        // Skip web search for clearly knowledge-base questions even if agent mentions search
+        const clearKnowledgeBaseQuestions = [
+            'can i fund', 'can i transfer', 'how do i', 'what is', 'how does',
+            'fund other', 'transfer to', 'send to', 'account management',
+            'wallet', 'balance', 'transaction'
+        ];
+        
+        const isKnowledgeBaseQuestion = clearKnowledgeBaseQuestions.some(pattern => 
+            userQuestion.includes(pattern)
+        );
+        
+        if (isKnowledgeBaseQuestion) {
+            elizaLogger.log("Skipping search - this is a knowledge base question about basic Akash concepts");
+            return false;
+        }
+        
+        // Only trigger web search for queries that need real-time/current information
+        const needsRealTimeInfo = requiresRealTimeSearch(userQuestion);
+        
+        elizaLogger.log(`Search promise evaluator: hasPromise=${hasPromise}, needsRealTimeInfo=${needsRealTimeInfo} for question: ${userQuestion}`);
+        
+        return needsRealTimeInfo;
     },
     
     handler: async (runtime: IAgentRuntime, message: Memory): Promise<void> => {
@@ -75,39 +225,42 @@ export const searchPromiseEvaluator: Evaluator = {
             
             // Find the user's question that triggered the search promise
             let searchQuery = "";
+            let userQuestion = "";
             
             for (let i = recentMessages.length - 1; i >= 0; i--) {
                 const mem = recentMessages[i];
                 if (mem.entityId !== runtime.agentId) {
                     // This is a user message, extract search terms
-                    const userText = mem.content.text || '';
+                    userQuestion = mem.content.text || '';
+                    const userText = userQuestion.toLowerCase();
                     
-                    // Extract key search terms from user question
-                    if (userText.toLowerCase().includes('cost') || userText.toLowerCase().includes('calculator')) {
-                        searchQuery = `Akash Network deployment cost calculator provider pricing tools`;
-                        break;
-                    } else if (userText.toLowerCase().includes('provider') && userText.toLowerCase().includes('earning')) {
-                        searchQuery = `Akash Network provider earnings rewards income calculation guide`;
-                        break;
-                    } else if (userText.toLowerCase().includes('provider') && userText.toLowerCase().includes('setup')) {
-                        searchQuery = `Akash Network provider setup guide worker configuration documentation`;
-                        break;
-                    } else if (userText.toLowerCase().includes('price') || userText.toLowerCase().includes('akt')) {
-                        searchQuery = `AKT token price current value Akash Network market`;
-                        break;
+                    // Create targeted search queries based on the type of real-time information needed
+                    if (userText.includes('akt price') || userText.includes('token price') || userText.includes('current price')) {
+                        searchQuery = `AKT token current price live market value Akash Network`;
+                    } else if (userText.includes('provider earning') || userText.includes('provider reward')) {
+                        searchQuery = `Akash Network provider earnings rewards current income statistics`;
+                    } else if (userText.includes('network stats') || userText.includes('active provider')) {
+                        searchQuery = `Akash Network current statistics active providers network metrics`;
+                    } else if (userText.includes('deployment cost') || userText.includes('cost calculator')) {
+                        searchQuery = `Akash Network current deployment costs pricing calculator 2024`;
+                    } else if (userText.includes('latest news') || userText.includes('recent update')) {
+                        searchQuery = `Akash Network latest news updates announcements 2024`;
+                    } else if (userText.includes('network status') || userText.includes('network health')) {
+                        searchQuery = `Akash Network current status network health operational`;
                     } else {
-                        // General Akash query
-                        searchQuery = `Akash Network ${userText}`;
-                        break;
+                        // Fallback for other real-time queries
+                        searchQuery = `Akash Network latest ${userText.replace(/[^\w\s]/g, '')}`;
                     }
+                    break;
                 }
             }
             
             if (!searchQuery) {
-                searchQuery = "Akash Network latest updates documentation";
+                searchQuery = `Akash Network current information ${userQuestion}`;
             }
             
-            elizaLogger.log(`Executing automatic search with query: ${searchQuery}`);
+            elizaLogger.log(`Executing targeted web search for real-time query: ${searchQuery}`);
+            elizaLogger.log(`Original user question: ${userQuestion}`);
             
             // Initialize and execute web search
             const webSearchService = new WebSearchService();
@@ -126,7 +279,7 @@ export const searchPromiseEvaluator: Evaluator = {
                     formattedResults += `${result.content.substring(0, 150)}...\n\n`;
                 });
                 
-                formattedResults += "*This information is based on current web search results.*";
+                formattedResults += "*This information is based on current web search results and may need verification from official sources.*";
                 
                 // Create a new memory with the search results
                 await runtime.createMemory({
@@ -136,15 +289,20 @@ export const searchPromiseEvaluator: Evaluator = {
                     roomId: message.roomId,
                     content: {
                         text: formattedResults,
-                        action: "WEB_SEARCH_RESULTS"
+                        action: "WEB_SEARCH_RESULTS",
+                        metadata: {
+                            searchQuery,
+                            userQuestion,
+                            resultCount: searchResponse.results.length
+                        }
                     },
                     createdAt: Date.now()
                 }, "messages");
                 
-                elizaLogger.log("Automatic search completed and results posted");
+                elizaLogger.log("Targeted web search completed and results posted");
                 
             } else {
-                elizaLogger.warn("Automatic search returned no results");
+                elizaLogger.warn("Web search returned no results for real-time query");
                 
                 // Post a message indicating no results found
                 await runtime.createMemory({
@@ -153,7 +311,7 @@ export const searchPromiseEvaluator: Evaluator = {
                     agentId: runtime.agentId,
                     roomId: message.roomId,
                     content: {
-                        text: "I searched for information but couldn't find specific results at the moment. Let me help you with what I know from my knowledge base instead.",
+                        text: "I couldn't find current information through web search at the moment. Let me help you with the information I have in my knowledge base instead.",
                         action: "SEARCH_NO_RESULTS"
                     },
                     createdAt: Date.now()
@@ -170,7 +328,7 @@ export const searchPromiseEvaluator: Evaluator = {
                 agentId: runtime.agentId,
                 roomId: message.roomId,
                 content: {
-                    text: "I encountered an issue while searching. Let me help you with the information I have in my knowledge base.",
+                    text: "I encountered an issue while searching for current information. Let me help you with the information I have in my knowledge base.",
                     action: "SEARCH_ERROR"
                 },
                 createdAt: Date.now()
@@ -180,18 +338,46 @@ export const searchPromiseEvaluator: Evaluator = {
     
     examples: [
         {
-            prompt: "User asked about provider costs and agent responded with 'searching now'",
+            prompt: "User asked about current AKT price and agent responded with 'searching now'",
             messages: [
                 {
                     name: "User",
-                    content: { text: "What are the current provider earnings on Akash?" }
+                    content: { text: "What's the current AKT token price?" }
                 },
                 {
                     name: "Navi", 
-                    content: { text: "I'll search for the latest provider earnings information. Searching now..." }
+                    content: { text: "I'll search for the latest AKT price information. Searching now..." }
                 }
             ],
-            outcome: "Execute web search for 'Akash Network provider earnings rewards income calculation guide' and post results"
+            outcome: "Execute web search for 'AKT token current price live market value Akash Network' and post results"
+        },
+        {
+            prompt: "User asked about general Akash concept and agent responded with 'let me search'",
+            messages: [
+                {
+                    name: "User",
+                    content: { text: "What is Akash Network and how does it work?" }
+                },
+                {
+                    name: "Navi", 
+                    content: { text: "Let me search for information about Akash Network..." }
+                }
+            ],
+            outcome: "Should NOT trigger web search as this is knowledge base information"
+        },
+        {
+            prompt: "User asked about data storage like Google Drive and agent responded with 'searching'",
+            messages: [
+                {
+                    name: "User",
+                    content: { text: "Can I use Akash for data storage like Google Drive?" }
+                },
+                {
+                    name: "Navi", 
+                    content: { text: "I'll search for information about Akash storage capabilities. Searching..." }
+                }
+            ],
+            outcome: "Should NOT trigger web search as persistent storage is covered in knowledge base"
         }
     ]
 };

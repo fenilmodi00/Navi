@@ -192,59 +192,93 @@ export const webSearch: Action = {
         // Check if message content should trigger web search
         const text = message.content.text?.toLowerCase() || '';
         
-        // Enhanced triggers including common user queries and follow-up search needs
-        const webSearchTriggers = [
-            // Time-based queries
-            'latest', 'recent', 'news', 'update', 'announcement', 'today', 
-            'this week', 'this month', 'roadmap', 'upcoming', 'release', 
-            'current', 'now', 'yesterday', 'just released', 'new feature',
-            'what is happening', 'what happened', 'status', 'progress',
-            'development', 'launched', 'launching', 'released', 'deployed',
+        // Knowledge base priority topics - these should NOT trigger web search immediately
+        const knowledgeBasePriorityTopics = [
+            // Basic Akash concepts that should be in knowledge base
+            'what is akash', 'akash network explain', 'akash for', 'use akash for',
+            'can i use akash', 'does akash support', 'akash capabilities',
+            'persistent storage', 'data storage', 'storage solution', 'google drive',
+            'file storage', 'backup storage', 'cloud storage', 'volume storage',
             
-            // Media and content
-            'social media', 'twitter', 'discord announcement', 'blog post',
-            'tweet', 'tweeting', 'twitter updates', 'social updates',
+            // Core features and concepts
+            'how does akash work', 'akash deployment process', 'sdl file', 'sdl template',
+            'akash providers', 'kubernetes on akash', 'docker on akash',
+            'container deployment', 'application deployment',
             
-            // Financial and pricing
-            'price', 'cost', 'current price', 'today price', 'coinbase', 'exchange',
-            'trading', 'market', 'value', 'worth', 'usd', 'dollar', 'token price',
-            'akt price', 'akt cost', 'market cap', 'trading volume',
+            // Basic troubleshooting (not time-sensitive)
+            'deployment failed', 'how to deploy', 'first deployment',
+            'getting started', 'beginner guide', 'tutorial',
             
-            // Technical operations
-            'bridge', 'bridging', 'transfer', 'move tokens', 'send tokens',
-            'ibc', 'cross-chain', 'osmosis', 'cosmos', 'keplr', 'withdraw', 'deposit',
-            
-            // Provider and deployment related
-            'provider', 'providers', 'deployment cost', 'runtime cost', 'actual cost',
-            'calculator', 'calculate cost', 'cost calculation', 'pricing tool',
-            'provider earnings', 'provider rewards', 'marketplace',
-            
-            // Network and troubleshooting
-            'down', 'offline', 'not working', 'issues', 'problem', 'error',
-            'network status', 'mainnet', 'testnet', 'validator',
-            
-            // Search intent indicators
-            'find', 'search', 'look up', 'check', 'verify', 'confirm',
-            'get me', 'show me', 'tell me about recent', 'any updates',
-            
-            // Explicit search requests
-            'web search', 'search the web', 'look online', 'check online',
-            'find online', 'internet search', 'google it', 'search for'
+            // Configuration and setup
+            'akash configuration', 'provider selection', 'resource allocation',
+            'port configuration', 'environment variables'
         ];
         
-        // Also check for explicit mentions of searching or finding current info
-        const searchIntentPhrases = [
-            'search for', 'find out', 'look up', 'check the', 'get current',
-            'find the latest', 'search web', 'web search', 'internet search',
-            'look online', 'check online', 'find online', 'verify online'
+        // Check if this is a knowledge base priority question
+        const isKnowledgeBasePriority = knowledgeBasePriorityTopics.some(topic => 
+            text.includes(topic)
+        );
+        
+        if (isKnowledgeBasePriority) {
+            elizaLogger.log(`Web search skipped - knowledge base priority topic detected: "${text}"`);
+            return false;
+        }
+        
+        // Real-time web search triggers - only for truly time-sensitive information
+        const realTimeSearchTriggers = [
+            // Time-based queries (must be current)
+            'latest', 'recent', 'news', 'today', 'this week', 'this month', 
+            'just released', 'announced today', 'breaking', 'now', 'currently',
+            'update', 'announcement', 'roadmap', 'upcoming', 'new release',
+            
+            // Financial and market data (always current)
+            'price', 'current price', 'today price', 'akt price', 'token price',
+            'market cap', 'trading volume', 'exchange rate', 'coinbase', 'trading',
+            
+            // Social media and communications
+            'twitter', 'social media', 'tweet', 'discord announcement', 'blog post',
+            'social updates', 'community updates',
+            
+            // Network status (real-time)
+            'down', 'offline', 'working', 'status', 'network status', 'issues',
+            'problems', 'outage', 'maintenance',
+            
+            // Provider marketplace (real-time)
+            'provider earnings', 'current providers', 'available providers',
+            'marketplace status', 'gpu availability', 'provider rewards',
+            
+            // Cross-chain operations (often changing)
+            'bridge', 'bridging', 'transfer tokens', 'ibc', 'osmosis', 'cosmos',
+            
+            // Events and community
+            'accelerate', 'event', 'conference', 'meetup', 'partnership',
+            
+            // Explicit search intent
+            'search for', 'find latest', 'check current', 'look up recent',
+            'web search', 'search web', 'google', 'find online'
         ];
         
-        const hasSearchTrigger = webSearchTriggers.some(trigger => text.includes(trigger));
-        const hasSearchIntent = searchIntentPhrases.some(phrase => text.includes(phrase));
+        // Check for explicit search phrases that always trigger web search
+        const explicitSearchPhrases = [
+            'search for', 'find the latest', 'check current', 'look up recent',
+            'web search', 'search the web', 'google it', 'find online',
+            'check online', 'verify online', 'search web'
+        ];
         
-        elizaLogger.log(`Web search validation: text="${text}", hasSearchTrigger=${hasSearchTrigger}, hasSearchIntent=${hasSearchIntent}`);
+        const hasRealTimeNeed = realTimeSearchTriggers.some(trigger => text.includes(trigger));
+        const hasExplicitSearchIntent = explicitSearchPhrases.some(phrase => text.includes(phrase));
         
-        return hasSearchTrigger || hasSearchIntent;
+        // Additional context checks
+        const hasTimeContext = /\b(today|now|currently|recent|latest|this week|this month)\b/.test(text);
+        const hasPriceContext = /\b(price|cost|usd|dollar|\$|market|trading)\b/.test(text);
+        const hasStatusContext = /\b(status|down|offline|working|issues|problems)\b/.test(text);
+        
+        const shouldWebSearch = hasRealTimeNeed || hasExplicitSearchIntent || 
+                               (hasTimeContext && (hasPriceContext || hasStatusContext));
+        
+        elizaLogger.log(`Web search validation: text="${text}", shouldWebSearch=${shouldWebSearch}, knowledgeBasePriority=${isKnowledgeBasePriority}`);
+        
+        return shouldWebSearch;
     },
     handler: async (
         runtime: IAgentRuntime,
@@ -264,7 +298,7 @@ export const webSearch: Action = {
         // Send initial response to let user know we're searching
         callback({
             text: "🔍 Searching for the latest information...",
-            thought: "User is asking for current information that requires web search. I'll search and provide the results."
+            thought: "User query requires current information not available in knowledge base. Initiating web search."
         });
 
         const webSearchService = new WebSearchService();
