@@ -63,7 +63,12 @@ export function requiresRealTimeSearch(query: string): boolean {
         'persistent storage', 'data storage', 'like google drive',
         'akash vs', 'comparison', 'difference between',
         'how to use', 'getting started', 'beginner guide',
-        'decentralized cloud', 'blockchain', 'container', 'kubernetes', 'docker'
+        'decentralized cloud', 'blockchain', 'container', 'kubernetes', 'docker',
+        'ongoing deployment', 'my deployment', 'deployment status', 'check deployment',
+        'manage deployment', 'deployment management', 'deployment cli', 'akash cli',
+        'can i use akash', 'can i deploy', 'can akash', 'use akash',
+        'remote pc', 'remote desktop', 'remote development', 'remote access',
+        'capability', 'feature', 'support', 'possible', 'available'
     ];
     
     // Strong indicators that definitely need web search (prioritize over knowledge base)
@@ -122,18 +127,17 @@ export const searchPromiseEvaluator: Evaluator = {
         
         const text = message.content.text?.toLowerCase() || '';
         
-        // Check if the agent promised to search - be more restrictive to avoid false positives
+        // Check if the agent promised to search - be VERY restrictive to avoid false positives
         const searchPromises = [
             'searching now',
-            'will search',
             'let me search',
-            'i\'ll search',
-            'searching for',
-            'web search',
-            'via web search',
-            'getting the latest',
-            'pulling fresh',
-            'will share findings'
+            'i\'ll search for',
+            'searching for current',
+            'searching for latest',
+            'web search for',
+            'getting the latest information',
+            'checking current status',
+            'finding recent updates'
         ];
         
         const hasPromise = searchPromises.some(promise => text.includes(promise));
@@ -143,20 +147,24 @@ export const searchPromiseEvaluator: Evaluator = {
         }
         
         // Additional check: Don't trigger if the agent is already providing substantial knowledge-based content
-        const hasSubstantialContent = text.length > 200 && (
+        const hasSubstantialContent = text.length > 100 && (
             text.includes('akash network') || 
             text.includes('deployment') || 
             text.includes('provider') ||
             text.includes('you can') ||
-            text.includes('to do this')
+            text.includes('to do this') ||
+            text.includes('i can help') ||
+            text.includes('i\'d be happy') ||
+            text.includes('you\'ll need') ||
+            text.includes('custom node') ||
+            text.includes('comfyui') ||
+            text.includes('setup') ||
+            text.includes('configuration')
         );
         
-        if (hasSubstantialContent && !text.includes('latest') && !text.includes('current')) {
+        // If agent is providing substantial content without explicit search promises, don't trigger search
+        if (hasSubstantialContent) {
             elizaLogger.log("Skipping search - agent already providing substantial knowledge-based response");
-            return false;
-        }
-        
-        if (!hasPromise) {
             return false;
         }
         
@@ -170,11 +178,11 @@ export const searchPromiseEvaluator: Evaluator = {
         // Check if there's already a recent response from the agent to the same question
         const recentAgentResponses = recentMessages.filter(msg => 
             msg.entityId === runtime.agentId && 
-            msg.createdAt > Date.now() - 30000 // Within last 30 seconds
+            msg.createdAt > Date.now() - 60000 // Within last 60 seconds
         );
         
-        if (recentAgentResponses.length > 1) {
-            elizaLogger.log("Skipping search - recent agent response already exists");
+        if (recentAgentResponses.length > 0) {
+            elizaLogger.log("Skipping search - recent agent response already exists within 60 seconds");
             return false;
         }
         
@@ -192,7 +200,12 @@ export const searchPromiseEvaluator: Evaluator = {
         const clearKnowledgeBaseQuestions = [
             'can i fund', 'can i transfer', 'how do i', 'what is', 'how does',
             'fund other', 'transfer to', 'send to', 'account management',
-            'wallet', 'balance', 'transaction'
+            'wallet', 'balance', 'transaction', 'ongoing deployment', 'my deployment',
+            'deployment status', 'check deployment', 'manage deployment', 'deployment management',
+            'what about my', 'how to check', 'view deployment', 'deployment command',
+            'deployment cli', 'akash cli', 'can i use', 'can i deploy', 'can akash',
+            'use akash for', 'use akash as', 'remote pc', 'remote desktop', 'data storage',
+            'storage', 'persistent', 'capabilities', 'features', 'support'
         ];
         
         const isKnowledgeBaseQuestion = clearKnowledgeBaseQuestions.some(pattern => 

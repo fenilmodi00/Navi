@@ -4,9 +4,9 @@ import { WebSearchService } from "./services/webSearchService";
 
 export const webSearchPlugin = {
     name: "webSearch",
-    description: "Search the web and get news with automatic promise fulfillment",
+    description: "Search the web and get news when agent decides to use WEB_SEARCH action",
     actions: [webSearch],
-    evaluators: [searchPromiseEvaluator],
+    evaluators: [searchPromiseEvaluator], // Only evaluator that executes search when agent promises to search
     providers: [],
     services: [new WebSearchService() as any],
     clients: [],

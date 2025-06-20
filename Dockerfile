@@ -36,17 +36,14 @@ RUN bun install
 
 # Build all workspace plugins first
 
-RUN cd plugins/plugin-web-search && bun run build
-
 # Build the main project 
 RUN bun run build
 
-# Clean up build artifacts and dev dependencies
+# Clean up build artifacts but keep all dependencies to avoid OpenTelemetry issues
 RUN rm -rf node_modules/.cache \
     && rm -rf /root/.bun/install/cache \
     && find . -name "*.test.*" -delete \
-    && find . -name "*.spec.*" -delete \
-    && bun install --production --frozen-lockfile
+    && find . -name "*.spec.*" -delete
 
 # Production stage
 FROM node:20-alpine

@@ -189,96 +189,11 @@ export const webSearch: Action = {
             return false;
         }
         
-        // Check if message content should trigger web search
-        const text = message.content.text?.toLowerCase() || '';
+        // This action should only run when explicitly called by the agent
+        // The agent should decide when web search is needed and include WEB_SEARCH in actions
+        elizaLogger.log("Web search action explicitly called by agent");
         
-        // Knowledge base priority topics - these should NOT trigger web search immediately
-        const knowledgeBasePriorityTopics = [
-            // Basic Akash concepts that should be in knowledge base
-            'what is akash', 'akash network explain', 'akash for', 'use akash for',
-            'can i use akash', 'does akash support', 'akash capabilities',
-            'persistent storage', 'data storage', 'storage solution', 'google drive',
-            'file storage', 'backup storage', 'cloud storage', 'volume storage',
-            
-            // Core features and concepts
-            'how does akash work', 'akash deployment process', 'sdl file', 'sdl template',
-            'akash providers', 'kubernetes on akash', 'docker on akash',
-            'container deployment', 'application deployment',
-            
-            // Basic troubleshooting (not time-sensitive)
-            'deployment failed', 'how to deploy', 'first deployment',
-            'getting started', 'beginner guide', 'tutorial',
-            
-            // Configuration and setup
-            'akash configuration', 'provider selection', 'resource allocation',
-            'port configuration', 'environment variables'
-        ];
-        
-        // Check if this is a knowledge base priority question
-        const isKnowledgeBasePriority = knowledgeBasePriorityTopics.some(topic => 
-            text.includes(topic)
-        );
-        
-        if (isKnowledgeBasePriority) {
-            elizaLogger.log(`Web search skipped - knowledge base priority topic detected: "${text}"`);
-            return false;
-        }
-        
-        // Real-time web search triggers - only for truly time-sensitive information
-        const realTimeSearchTriggers = [
-            // Time-based queries (must be current)
-            'latest', 'recent', 'news', 'today', 'this week', 'this month', 
-            'just released', 'announced today', 'breaking', 'now', 'currently',
-            'update', 'announcement', 'roadmap', 'upcoming', 'new release',
-            
-            // Financial and market data (always current)
-            'price', 'current price', 'today price', 'akt price', 'token price',
-            'market cap', 'trading volume', 'exchange rate', 'coinbase', 'trading',
-            
-            // Social media and communications
-            'twitter', 'social media', 'tweet', 'discord announcement', 'blog post',
-            'social updates', 'community updates',
-            
-            // Network status (real-time)
-            'down', 'offline', 'working', 'status', 'network status', 'issues',
-            'problems', 'outage', 'maintenance',
-            
-            // Provider marketplace (real-time)
-            'provider earnings', 'current providers', 'available providers',
-            'marketplace status', 'gpu availability', 'provider rewards',
-            
-            // Cross-chain operations (often changing)
-            'bridge', 'bridging', 'transfer tokens', 'ibc', 'osmosis', 'cosmos',
-            
-            // Events and community
-            'accelerate', 'event', 'conference', 'meetup', 'partnership',
-            
-            // Explicit search intent
-            'search for', 'find latest', 'check current', 'look up recent',
-            'web search', 'search web', 'google', 'find online'
-        ];
-        
-        // Check for explicit search phrases that always trigger web search
-        const explicitSearchPhrases = [
-            'search for', 'find the latest', 'check current', 'look up recent',
-            'web search', 'search the web', 'google it', 'find online',
-            'check online', 'verify online', 'search web'
-        ];
-        
-        const hasRealTimeNeed = realTimeSearchTriggers.some(trigger => text.includes(trigger));
-        const hasExplicitSearchIntent = explicitSearchPhrases.some(phrase => text.includes(phrase));
-        
-        // Additional context checks
-        const hasTimeContext = /\b(today|now|currently|recent|latest|this week|this month)\b/.test(text);
-        const hasPriceContext = /\b(price|cost|usd|dollar|\$|market|trading)\b/.test(text);
-        const hasStatusContext = /\b(status|down|offline|working|issues|problems)\b/.test(text);
-        
-        const shouldWebSearch = hasRealTimeNeed || hasExplicitSearchIntent || 
-                               (hasTimeContext && (hasPriceContext || hasStatusContext));
-        
-        elizaLogger.log(`Web search validation: text="${text}", shouldWebSearch=${shouldWebSearch}, knowledgeBasePriority=${isKnowledgeBasePriority}`);
-        
-        return shouldWebSearch;
+        return true;
     },
     handler: async (
         runtime: IAgentRuntime,

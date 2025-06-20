@@ -22,6 +22,7 @@
         "@elizaos/core": "1.0.7",
         "@elizaos/plugin-bootstrap": "1.0.7",
         "@elizaos/plugin-knowledge": "workspace:*",
+        "@opentelemetry/api": "^1.9.0",
         "@tavily/core": "^0.0.2"
     },
     "scripts": {
