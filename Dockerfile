@@ -23,34 +23,25 @@ RUN if [ ! -f /usr/bin/python ]; then ln -s /usr/bin/python3 /usr/bin/python; fi
 # Copy package files first for better caching
 COPY package.json bun.lock bunfig.toml ./
 
-# Copy plugin package.json files first to establish workspace structure
-COPY plugins/plugin-akash/package.json ./plugins/plugin-akash/
-COPY plugins/plugin-akash-chat/package.json ./plugins/plugin-akash-chat/
-COPY plugins/plugin-knowledge/package.json ./plugins/plugin-knowledge/
-COPY plugins/plugin-web-search/package.json ./plugins/plugin-web-search/
-
-# Install dependencies first (workspace structure is now available)
-RUN bun install --frozen-lockfile
-
 # Copy configuration files
 COPY tsconfig.json tsup.config.ts ./
 
-# Copy all plugins source code
+# Copy plugins and source code (needed for workspace dependencies)
+COPY src ./src
 COPY plugins ./plugins
 
-# Copy source code
-COPY src ./src
+# Install dependencies (after workspace plugins are available)
+RUN bun install
 
-# Build all workspace plugins first
-
-# Build the main project 
+# Build the project
 RUN bun run build
 
-# Clean up build artifacts but keep all dependencies to avoid OpenTelemetry issues
+# Clean up build artifacts and dev dependencies
 RUN rm -rf node_modules/.cache \
     && rm -rf /root/.bun/install/cache \
     && find . -name "*.test.*" -delete \
-    && find . -name "*.spec.*" -delete
+    && find . -name "*.spec.*" -delete \
+    && bun install --production --frozen-lockfile
 
 # Production stage
 FROM node:20-alpine
@@ -78,9 +69,8 @@ COPY --from=builder /app/plugins ./plugins
 # Create necessary directories for ElizaOS
 RUN mkdir -p data .eliza
 
-# Set environment to production and disable plugin auto-installation
+# Set environment to production
 ENV NODE_ENV=production
-ENV ELIZA_AUTO_INSTALL_PLUGINS=false
 
 # Expose default ports
 EXPOSE 3000
