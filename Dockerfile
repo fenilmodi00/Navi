@@ -23,16 +23,23 @@ RUN if [ ! -f /usr/bin/python ]; then ln -s /usr/bin/python3 /usr/bin/python; fi
 # Copy package files first for better caching
 COPY package.json bun.lock bunfig.toml ./
 
+# Copy plugin package.json files first to establish workspace structure
+COPY plugins/plugin-akash/package.json ./plugins/plugin-akash/
+COPY plugins/plugin-akash-chat/package.json ./plugins/plugin-akash-chat/
+COPY plugins/plugin-knowledge/package.json ./plugins/plugin-knowledge/
+COPY plugins/plugin-web-search/package.json ./plugins/plugin-web-search/
+
+# Install dependencies first (workspace structure is now available)
+RUN bun install --frozen-lockfile
+
 # Copy configuration files
 COPY tsconfig.json tsup.config.ts ./
 
-# Copy plugins and source code (needed for workspace dependencies)
-COPY src ./src
+# Copy all plugins source code
 COPY plugins ./plugins
 
-
-# Install dependencies (after workspace plugins are available)
-RUN bun install
+# Copy source code
+COPY src ./src
 
 # Build all workspace plugins first
 
