@@ -1,33 +1,24 @@
 import { UUID } from '@elizaos/core';
 import z from 'zod';
-import type { UUID as UUIDType } from '@elizaos/core';
 
 // Schema for validating model configuration
 export const ModelConfigSchema = z.object({
   // Provider configuration
   // NOTE: If EMBEDDING_PROVIDER is not specified, the plugin automatically assumes
-  // plugin-openai is being used and will use OPENAI_EMBEDDING_MODEL and
-  // OPENAI_EMBEDDING_DIMENSIONS for configuration
-  EMBEDDING_PROVIDER: z.enum(['openai', 'google', 'akash']),
-  TEXT_PROVIDER: z.enum(['openai', 'anthropic', 'openrouter', 'google', 'akash']).optional(),
+  // plugin-akash-chat is being used and will use AKASH_CHAT_API_KEY for configuration
+  EMBEDDING_PROVIDER: z.enum(['akash-chat']).optional(),
+  TEXT_PROVIDER: z.enum(['akash-chat']).optional(),
 
   // API keys
-  OPENAI_API_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
   AKASH_CHAT_API_KEY: z.string().optional(),
 
   // Base URLs (optional for most providers)
-  OPENAI_BASE_URL: z.string().optional(),
-  ANTHROPIC_BASE_URL: z.string().optional(),
-  OPENROUTER_BASE_URL: z.string().optional(),
-  GOOGLE_BASE_URL: z.string().optional(),
   AKASH_CHAT_BASE_URL: z.string().optional(),
 
   // Model names
   TEXT_EMBEDDING_MODEL: z.string(),
   TEXT_MODEL: z.string().optional(),
+  CTX_KNOWLEDGE_MODEL: z.string().optional(), // Large model for knowledge processing
 
   // Token limits
   MAX_INPUT_TOKENS: z
@@ -41,8 +32,7 @@ export const ModelConfigSchema = z.object({
     .transform((val) => (val ? (typeof val === 'string' ? parseInt(val, 10) : val) : 4096)),
 
   // Embedding dimension
-  // For OpenAI: Only applies to text-embedding-3-small and text-embedding-3-large models
-  // Default: 1536 dimensions
+  // Default: 1536 dimensions for most embedding models
   EMBEDDING_DIMENSION: z
     .string()
     .or(z.number())
@@ -73,14 +63,14 @@ export interface ProviderRateLimits {
  * Options for text generation overrides
  */
 export interface TextGenerationOptions {
-  provider?: 'anthropic' | 'openai' | 'openrouter' | 'google';
+  provider?: 'akash-chat';
   modelName?: string;
   maxTokens?: number;
   /**
    * Document to cache for contextual retrieval.
-   * When provided (along with an Anthropic model via OpenRouter), this enables prompt caching.
-   * The document is cached with the provider and subsequent requests will reuse the cached document,
-   * significantly reducing costs for multiple operations on the same document.
+   * When provided, this enables prompt caching where supported by the provider.
+   * The document is cached and subsequent requests will reuse the cached document,
+   * potentially reducing costs for multiple operations on the same document.
    * Most effective with contextual retrieval for Knowledge applications.
    */
   cacheDocument?: string;
@@ -88,7 +78,7 @@ export interface TextGenerationOptions {
   /**
    * Options for controlling the cache behavior.
    * Currently supports { type: 'ephemeral' } which sets up a temporary cache.
-   * Cache expires after approximately 5 minutes with Anthropic models.
+   * Cache expires after approximately 5 minutes.
    * This can reduce costs by up to 90% for reads after the initial cache write.
    */
   cacheOptions?: {
@@ -96,7 +86,7 @@ export interface TextGenerationOptions {
   };
   /**
    * Whether to automatically detect and enable caching for contextual retrieval.
-   * Default is true for OpenRouter+Anthropic models with document-chunk prompts.
+   * Default is true for supported models with document-chunk prompts.
    * Set to false to disable automatic caching detection.
    */
   autoCacheContextualRetrieval?: boolean;
@@ -106,6 +96,8 @@ export interface TextGenerationOptions {
  * Options for adding knowledge to the system
  */
 export interface AddKnowledgeOptions {
+  /** Agent ID from the frontend - if not provided, will use runtime.agentId */
+  agentId?: UUID;
   worldId: UUID;
   roomId: UUID;
   entityId: UUID;
@@ -121,7 +113,7 @@ export interface AddKnowledgeOptions {
    * - Plain text for text files
    */
   content: string;
-  /** 
+  /**
    * Optional metadata to associate with the knowledge
    * Used for storing additional information like source URL
    */
@@ -162,20 +154,32 @@ export interface KnowledgeConfig {
   EMBEDDING_PROVIDER?: string;
   TEXT_PROVIDER?: string;
   TEXT_EMBEDDING_MODEL?: string;
-  // Git repository settings
-  DOCS_REPOS?: string;
-  // Individual repository configurations
-  DOCS_REPO_1_URL?: string;
-  DOCS_REPO_1_PATH?: string;
-  DOCS_REPO_1_BRANCH?: string;
-  DOCS_REPO_1_DOCS_PATH?: string;
   // Add any other plugin-specific configurations
-  // Index signature to match Metadata interface
-  [key: string]: any;
 }
 
 export interface LoadResult {
   successful: number;
   failed: number;
   errors?: Array<{ filename: string; error: string }>;
+}
+
+/**
+ * Extends the base MemoryMetadata from @elizaos/core with additional fields
+ */
+export interface ExtendedMemoryMetadata extends Record<string, any> {
+  type?: string;
+  title?: string;
+  filename?: string;
+  path?: string;
+  description?: string;
+  fileExt?: string;
+  timestamp?: number;
+  contentType?: string;
+  documentId?: string;
+  source?: string;
+  fileType?: string;
+  fileSize?: number;
+  position?: number; // For fragments
+  originalFilename?: string;
+  url?: string; // For web content
 }

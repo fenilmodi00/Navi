@@ -89,18 +89,16 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Include 2-3 sentences after the chunk that complete thoughts or provide resolution
 4. For technical documents, include any definitions or explanations of terms used in the chunk
 5. For narrative content, include character or setting information needed to understand the chunk
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. Do not use phrases like "this chunk discusses" - directly present the context
 8. The total length should be between {min_tokens} and {max_tokens} tokens
 9. Format the response as a single coherent paragraph
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
 
 Provide ONLY the enriched chunk text in your response:`;
 
 /**
  * Caching-optimized chunk prompt - separates document from instructions
- * This version doesn't include the document inline to support OpenRouter caching
+ * This version doesn't include the document inline to support efficient caching
  */
 export const CACHED_CHUNK_PROMPT_TEMPLATE = `
 Here is the chunk we want to situate within the whole document:
@@ -115,12 +113,10 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Include 2-3 sentences after the chunk that complete thoughts or provide resolution
 4. For technical documents, include any definitions or explanations of terms used in the chunk
 5. For narrative content, include character or setting information needed to understand the chunk
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. Do not use phrases like "this chunk discusses" - directly present the context
 8. The total length should be between {min_tokens} and {max_tokens} tokens
-9. Format the response as a single coherent paragraph that flows naturally
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
+9. Format the response as a single coherent paragraph
 
 Provide ONLY the enriched chunk text in your response:`;
 
@@ -140,10 +136,9 @@ Create an enriched version of this code chunk by adding critical surrounding con
 3. Add necessary type definitions or interfaces that are referenced in this chunk
 4. Include any crucial comments from elsewhere in the document that explain this code
 5. If there are key variable declarations or initializations earlier in the document, include those
-6. IMPORTANT: Your response MUST contain the original chunk code exactly as provided above
+6. Keep the original chunk COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original code must be present verbatim.
+8. Do NOT include implementation details for functions that are only called but not defined in this chunk
 
 Provide ONLY the enriched code chunk in your response:`;
 
@@ -163,11 +158,9 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Add section/subsection names or figure references if they help situate the chunk
 4. If variables or symbols are defined elsewhere in the document, include these definitions
 5. If mathematical expressions appear corrupted, try to infer their meaning from context
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
 8. Format the response as a coherent mathematical explanation
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
 
 Provide ONLY the enriched chunk text in your response:`;
 
@@ -187,11 +180,9 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Add section/subsection headings or navigation path to situate this chunk within the document structure
 4. Include any definitions of technical terms, acronyms, or jargon used in this chunk
 5. If this chunk references specific configurations, include relevant parameter explanations
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
 8. Format the response maintaining any hierarchical structure present in the original
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
 
 Provide ONLY the enriched chunk text in your response:`;
 
@@ -215,11 +206,9 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Add section/subsection names or figure references if they help situate the chunk
 4. If variables or symbols are defined elsewhere in the document, include these definitions
 5. If mathematical expressions appear corrupted, try to infer their meaning from context
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
 8. Format the response as a coherent mathematical explanation
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
 
 Provide ONLY the enriched chunk text in your response:`;
 
@@ -243,11 +232,9 @@ Create an enriched version of this code chunk by adding critical surrounding con
 3. Add necessary type definitions or interfaces that are referenced in this chunk
 4. Include any crucial comments from elsewhere in the document that explain this code
 5. If there are key variable declarations or initializations earlier in the document, include those
-6. IMPORTANT: Your response MUST contain the original chunk code exactly as provided above
+6. Keep the original chunk COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
 8. Do NOT include implementation details for functions that are only called but not defined in this chunk
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original code must be present verbatim.
 
 Provide ONLY the enriched code chunk in your response:`;
 
@@ -271,11 +258,9 @@ Create an enriched version of this chunk by adding critical surrounding context.
 3. Add section/subsection headings or navigation path to situate this chunk within the document structure
 4. Include any definitions of technical terms, acronyms, or jargon used in this chunk
 5. If this chunk references specific configurations, include relevant parameter explanations
-6. IMPORTANT: Your response MUST contain the original chunk text exactly as provided above
+6. Keep the original chunk text COMPLETELY INTACT and UNCHANGED in your response
 7. The total length should be between {min_tokens} and {max_tokens} tokens
 8. Format the response maintaining any hierarchical structure present in the original
-
-CRITICAL: Your response must include the exact original chunk content shown above. You can add context before or after it, but the original text must be present verbatim.
 
 Provide ONLY the enriched chunk text in your response:`;
 
@@ -321,7 +306,7 @@ export function getContextualizationPrompt(
 
 /**
  * Generates a caching-compatible prompt string for contextual enrichment.
- * This separates the document from the chunk instructions to support OpenRouter caching.
+ * This separates the document from the chunk instructions to support efficient caching.
  *
  * @param chunkContent - The content of the specific chunk to be contextualized.
  * @param contentType - Optional content type to determine specialized prompts.
@@ -460,7 +445,7 @@ export function getPromptForMimeType(
 
 /**
  * Optimized version of getPromptForMimeType that separates document from prompt.
- * Returns structured data that supports OpenRouter caching.
+ * Returns structured data that supports efficient caching.
  *
  * @param mimeType - The MIME type of the document.
  * @param chunkContent - The content of the specific chunk.
@@ -643,14 +628,6 @@ export function getChunkWithContext(
       "Generated context is empty. Falling back to original chunk content."
     );
     return chunkContent;
-  }
-
-  // Verify that the generated context contains the original chunk
-  if (!generatedContext.includes(chunkContent)) {
-    console.warn(
-      "Generated context does not contain the original chunk. Appending original to ensure data integrity."
-    );
-    return `${generatedContext.trim()}\n\n${chunkContent}`;
   }
 
   return generatedContext.trim();

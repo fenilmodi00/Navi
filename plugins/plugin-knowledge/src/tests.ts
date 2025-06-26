@@ -977,9 +977,9 @@ export class KnowledgeTestSuite implements TestSuite {
         // Initialize plugin
         await knowledgePlugin.init!(
           {
-            EMBEDDING_PROVIDER: "openai",
-            OPENAI_API_KEY: "test-key",
-            TEXT_EMBEDDING_MODEL: "text-embedding-3-small",
+            EMBEDDING_PROVIDER: "akash-chat",
+            AKASH_CHAT_API_KEY: "test-key",
+            TEXT_EMBEDDING_MODEL: "BAAI-bge-large-en-v1-5",
           },
           runtime
         );

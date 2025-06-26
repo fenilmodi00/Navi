@@ -313,6 +313,26 @@ async function generateAkashChatText(
     stopSequences: string[];
   }
 ) {
+  return generateAkashChatTextWithPriority(akashchat, model, params, 'foreground');
+}
+
+/**
+ * Generate text using AkashChat API with configurable priority
+ */
+async function generateAkashChatTextWithPriority(
+  akashchat: ReturnType<typeof createOpenAI>,
+  model: string,
+  params: {
+    prompt: string;
+    system?: string;
+    temperature: number;
+    maxTokens: number;
+    frequencyPenalty: number;
+    presencePenalty: number;
+    stopSequences: string[];
+  },
+  priority: 'foreground' | 'background' = 'foreground'
+) {
   return requestQueue.enqueue(async () => {
     try {
       const { text } = await generateText({
@@ -325,18 +345,23 @@ async function generateAkashChatText(
         presencePenalty: params.presencePenalty,
         stopSequences: params.stopSequences,
       });
+      
+      // Log model usage for debugging
+      const taskType = priority === 'background' ? 'knowledge' : 'chat';
+      logger.debug(`🤖 Akash Chat: Used model "${model}" for ${taskType} task (${priority} priority)`);
+      
       return text;
     } catch (error: unknown) {
       if (error instanceof Error && error.message.includes('Rate limit')) {
         return handleRateLimitError(error, () => 
-          generateAkashChatText(akashchat, model, params)
+          generateAkashChatTextWithPriority(akashchat, model, params, priority)
         ) as Promise<string>;
       }
       
       logger.error('Error generating text:', error);
       return 'Error generating text. Please try again later.';
     }
-  }, 'foreground'); // High priority for user chat
+  }, priority);
 }
 
 /**
@@ -348,6 +373,18 @@ async function generateAkashChatObject(
   model: string,
   params: ObjectGenerationParams
 ) {
+  return generateAkashChatObjectWithPriority(akashchat, model, params, 'foreground');
+}
+
+/**
+ * Generate object using AkashChat API with configurable priority
+ */
+async function generateAkashChatObjectWithPriority(
+  akashchat: ReturnType<typeof createOpenAI>,
+  model: string,
+  params: ObjectGenerationParams,
+  priority: 'foreground' | 'background' = 'foreground'
+) {
   return requestQueue.enqueue(async () => {
     try {
       const { object } = await generateObject({
@@ -356,18 +393,23 @@ async function generateAkashChatObject(
         prompt: params.prompt,
         temperature: params.temperature,
       });
+      
+      // Log model usage for debugging
+      const taskType = priority === 'background' ? 'knowledge' : 'chat';
+      logger.debug(`🤖 Akash Chat: Used model "${model}" for ${taskType} object task (${priority} priority)`);
+      
       return object;
     } catch (error: unknown) {
       if (error instanceof Error && error.message.includes('Rate limit')) {
         return handleRateLimitError(error, () => 
-          generateAkashChatObject(akashchat, model, params)
+          generateAkashChatObjectWithPriority(akashchat, model, params, priority)
         );
       }
       
       logger.error('Error generating object:', error);
       return {};
     }
-  }, 'foreground'); // High priority for user chat
+  }, priority);
 }
 
 /**
@@ -425,10 +467,9 @@ export const akashchatPlugin: Plugin = {
   },
   
   models: {
-    [ModelType.TEXT_EMBEDDING]: async (
-      runtime,
-      params: TextEmbeddingParams | string | null
-    ): Promise<number[]> => {
+    async [ModelType.TEXT_EMBEDDING](runtime, params) {
+      logger.debug(`[AkashChatPlugin] Model handler called: TEXT_EMBEDDING, params:`, params);
+      
       const embeddingDimension = parseInt(
         getSetting(runtime, 'AKASHCHAT_EMBEDDING_DIMENSIONS', '1024')
       ) as (typeof VECTOR_DIMS)[keyof typeof VECTOR_DIMS];
@@ -504,32 +545,36 @@ export const akashchatPlugin: Plugin = {
       }
     },
     
-    [ModelType.TEXT_TOKENIZER_ENCODE]: async (
-      runtime,
-      { prompt, modelType = ModelType.TEXT_LARGE }: TokenizeTextParams
-    ) => {
+    async [ModelType.TEXT_TOKENIZER_ENCODE](runtime, { prompt, modelType = ModelType.TEXT_LARGE }: TokenizeTextParams) {
       return tokenizeText(runtime, modelType ?? ModelType.TEXT_LARGE, prompt);
     },
     
-    [ModelType.TEXT_TOKENIZER_DECODE]: async (
-      runtime,
-      { tokens, modelType = ModelType.TEXT_LARGE }: DetokenizeTextParams
-    ) => {
+    async [ModelType.TEXT_TOKENIZER_DECODE](runtime, { tokens, modelType = ModelType.TEXT_LARGE }: DetokenizeTextParams) {
       return detokenizeText(runtime, modelType ?? ModelType.TEXT_LARGE, tokens);
     },
     
-    [ModelType.TEXT_SMALL]: async (runtime, { 
+    async [ModelType.TEXT_SMALL](runtime, { 
       prompt, 
       stopSequences = [],
       maxTokens = 8192,
       temperature =  0.7,
       frequencyPenalty = 0.7,
       presencePenalty = 0.7,
-    }: GenerateTextParams) => {
+    }: GenerateTextParams) {
+      logger.debug(`[AkashChatPlugin] Model handler called: TEXT_SMALL, params:`, { 
+        prompt, 
+        stopSequences, 
+        maxTokens, 
+        temperature, 
+        frequencyPenalty, 
+        presencePenalty 
+      });
+      
       const akashchat = getAkashChatClient(runtime);
       const model = getModelName(runtime, ModelType.TEXT_SMALL);
       
-      return generateAkashChatText(akashchat, model, {
+      // Use foreground priority for TEXT_SMALL (typically user chat)
+      return generateAkashChatTextWithPriority(akashchat, model, {
         prompt,
         system: runtime.character.system,
         temperature,
@@ -537,24 +582,31 @@ export const akashchatPlugin: Plugin = {
         frequencyPenalty,
         presencePenalty,
         stopSequences,
-      });
+      }, 'foreground');
     },
     
-    [ModelType.TEXT_LARGE]: async (
-      runtime,
-      {
-        prompt,
-        stopSequences = [],
-        maxTokens = 8192,
-        temperature = 0.7,
-        frequencyPenalty = 0.7,
-        presencePenalty = 0.7,
-      }: GenerateTextParams
-    ) => {
+    async [ModelType.TEXT_LARGE](runtime, {
+      prompt,
+      stopSequences = [],
+      maxTokens = 8192,
+      temperature = 0.7,
+      frequencyPenalty = 0.7,
+      presencePenalty = 0.7,
+    }: GenerateTextParams) {
+      logger.debug(`[AkashChatPlugin] Model handler called: TEXT_LARGE, params:`, { 
+        prompt, 
+        stopSequences, 
+        maxTokens, 
+        temperature, 
+        frequencyPenalty, 
+        presencePenalty 
+      });
+      
       const akashchat = getAkashChatClient(runtime);
       const model = getModelName(runtime, ModelType.TEXT_LARGE);
       
-      return generateAkashChatText(akashchat, model, {
+      // Use background priority for TEXT_LARGE (typically knowledge processing)
+      return generateAkashChatTextWithPriority(akashchat, model, {
         prompt,
         system: runtime.character.system,
         temperature,
@@ -562,21 +614,27 @@ export const akashchatPlugin: Plugin = {
         frequencyPenalty,
         presencePenalty,
         stopSequences,
-      });
+      }, 'background');
     },
     
-    [ModelType.OBJECT_SMALL]: async (runtime, params: ObjectGenerationParams) => {
+    async [ModelType.OBJECT_SMALL](runtime, params: ObjectGenerationParams) {
+      logger.debug(`[AkashChatPlugin] Model handler called: OBJECT_SMALL, params:`, params);
+      
       const akashchat = getAkashChatClient(runtime);
       const model = getModelName(runtime, ModelType.TEXT_SMALL);
       
-      return generateAkashChatObject(akashchat, model, params);
+      // Use foreground priority for OBJECT_SMALL (typically user chat)
+      return generateAkashChatObjectWithPriority(akashchat, model, params, 'foreground');
     },
     
-    [ModelType.OBJECT_LARGE]: async (runtime, params: ObjectGenerationParams) => {
+    async [ModelType.OBJECT_LARGE](runtime, params: ObjectGenerationParams) {
+      logger.debug(`[AkashChatPlugin] Model handler called: OBJECT_LARGE, params:`, params);
+      
       const akashchat = getAkashChatClient(runtime);
       const model = getModelName(runtime, ModelType.TEXT_LARGE);
       
-      return generateAkashChatObject(akashchat, model, params);
+      // Use background priority for OBJECT_LARGE (typically knowledge processing)
+      return generateAkashChatObjectWithPriority(akashchat, model, params, 'background');
     },
   },
   

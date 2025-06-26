@@ -13,6 +13,7 @@ import {
   Service,
   splitChunks,
   UUID,
+  Metadata,
 } from '@elizaos/core';
 import {
   createDocumentMemory,
@@ -22,14 +23,16 @@ import {
 import { AddKnowledgeOptions } from './types.ts';
 import type { KnowledgeConfig, LoadResult } from './types';
 import { loadDocsFromPath } from './docs-loader';
-import { isBinaryContentType } from './utils.ts';
+import { syncAllGitHubRepos, isGitAvailable } from './github-sync';
+import { isBinaryContentType, looksLikeBase64, generateContentBasedId } from './utils.ts';
 
 /**
  * Knowledge Service - Provides retrieval augmented generation capabilities
  */
 export class KnowledgeService extends Service {
   static readonly serviceType = 'knowledge';
-  public config: KnowledgeConfig;
+  public override config: Metadata;
+  private knowledgeConfig: KnowledgeConfig;
   capabilityDescription =
     'Provides Retrieval Augmented Generation capabilities, including knowledge upload and querying.';
 
@@ -49,35 +52,35 @@ export class KnowledgeService extends Service {
       return false; // Default to false if undefined or other type
     };
 
-    // Read configuration from runtime settings, with fallbacks to environment variables
-    const ctxKnowledgeEnabled = config?.CTX_KNOWLEDGE_ENABLED ?? 
-      runtime.getSetting('CTX_KNOWLEDGE_ENABLED') ?? 
-      process.env.CTX_KNOWLEDGE_ENABLED ?? 'true';
-    
-    const loadDocsOnStartup = config?.LOAD_DOCS_ON_STARTUP ?? 
-      runtime.getSetting('LOAD_DOCS_ON_STARTUP') ?? 
-      process.env.LOAD_DOCS_ON_STARTUP ?? 'true';
+    // Only enable LOAD_DOCS_ON_STARTUP if explicitly set to true
+    const loadDocsOnStartup =
+      parseBooleanEnv(config?.LOAD_DOCS_ON_STARTUP) || process.env.LOAD_DOCS_ON_STARTUP === 'true';
 
-    this.config = {
-      CTX_KNOWLEDGE_ENABLED: parseBooleanEnv(ctxKnowledgeEnabled),
-      LOAD_DOCS_ON_STARTUP: parseBooleanEnv(loadDocsOnStartup),
-      MAX_INPUT_TOKENS: config?.MAX_INPUT_TOKENS ?? runtime.getSetting('MAX_INPUT_TOKENS'),
-      MAX_OUTPUT_TOKENS: config?.MAX_OUTPUT_TOKENS ?? runtime.getSetting('MAX_OUTPUT_TOKENS'),
-      EMBEDDING_PROVIDER: config?.EMBEDDING_PROVIDER ?? runtime.getSetting('EMBEDDING_PROVIDER'),
-      TEXT_PROVIDER: config?.TEXT_PROVIDER ?? runtime.getSetting('TEXT_PROVIDER'),
-      TEXT_EMBEDDING_MODEL: config?.TEXT_EMBEDDING_MODEL ?? runtime.getSetting('TEXT_EMBEDDING_MODEL'),
+    this.knowledgeConfig = {
+      CTX_KNOWLEDGE_ENABLED: parseBooleanEnv(config?.CTX_KNOWLEDGE_ENABLED),
+      LOAD_DOCS_ON_STARTUP: loadDocsOnStartup,
+      MAX_INPUT_TOKENS: config?.MAX_INPUT_TOKENS,
+      MAX_OUTPUT_TOKENS: config?.MAX_OUTPUT_TOKENS,
+      EMBEDDING_PROVIDER: config?.EMBEDDING_PROVIDER,
+      TEXT_PROVIDER: config?.TEXT_PROVIDER,
+      TEXT_EMBEDDING_MODEL: config?.TEXT_EMBEDDING_MODEL,
     };
 
+    // Store config as Metadata for base class compatibility
+    this.config = { ...this.knowledgeConfig } as Metadata;
+
     logger.info(
-      `KnowledgeService initialized for agent ${this.runtime.agentId} with config:
-    CTX_KNOWLEDGE_ENABLED: ${this.config.CTX_KNOWLEDGE_ENABLED}
-    LOAD_DOCS_ON_STARTUP: ${this.config.LOAD_DOCS_ON_STARTUP}`
+      `KnowledgeService initialized for agent ${this.runtime.agentId} with config:`,
+      this.knowledgeConfig
     );
 
-    if (this.config.LOAD_DOCS_ON_STARTUP) {
+    if (this.knowledgeConfig.LOAD_DOCS_ON_STARTUP) {
+      logger.info('LOAD_DOCS_ON_STARTUP is enabled. Loading documents from docs folder...');
       this.loadInitialDocuments().catch((error) => {
         logger.error('Error during initial document loading in KnowledgeService:', error);
       });
+    } else {
+      logger.info('LOAD_DOCS_ON_STARTUP is disabled. Skipping automatic document loading.');
     }
   }
 
@@ -113,6 +116,23 @@ export class KnowledgeService extends Service {
    */
   static async start(runtime: IAgentRuntime): Promise<KnowledgeService> {
     logger.info(`Starting Knowledge service for agent: ${runtime.agentId}`);
+    
+    // Sync GitHub repositories before initializing service and loading documents
+    if (isGitAvailable()) {
+      try {
+        logger.info('Syncing GitHub repositories before starting Knowledge service...');
+        const syncedCount = await syncAllGitHubRepos();
+        if (syncedCount > 0) {
+          logger.info(`Successfully synced ${syncedCount} GitHub repositories`);
+        }
+      } catch (error) {
+        logger.error('Error syncing GitHub repositories:', error);
+        // Continue with service startup even if GitHub sync fails
+      }
+    } else {
+      logger.debug('Git not available, skipping GitHub repository sync');
+    }
+    
     const service = new KnowledgeService(runtime);
 
     // Process character knowledge AFTER service is initialized
@@ -144,11 +164,13 @@ export class KnowledgeService extends Service {
    */
   static async stop(runtime: IAgentRuntime): Promise<void> {
     logger.info(`Stopping Knowledge service for agent: ${runtime.agentId}`);
-    const service = runtime.getService(KnowledgeService.serviceType) as
-      | KnowledgeService
-      | undefined;
+    const service = runtime.getService(KnowledgeService.serviceType);
     if (!service) {
       logger.warn(`KnowledgeService not found for agent ${runtime.agentId} during stop.`);
+    }
+    // If we need to perform specific cleanup on the KnowledgeService instance
+    if (service instanceof KnowledgeService) {
+      await service.stop();
     }
   }
 
@@ -169,39 +191,42 @@ export class KnowledgeService extends Service {
     storedDocumentMemoryId: UUID;
     fragmentCount: number;
   }> {
-    const agentId = this.runtime.agentId as string;
+    // Use agentId from options if provided (from frontend), otherwise fall back to runtime
+    const agentId = options.agentId || (this.runtime.agentId as UUID);
+
+    // Generate content-based ID to ensure consistency
+    const contentBasedId = generateContentBasedId(options.content, agentId, {
+      includeFilename: options.originalFilename,
+      contentType: options.contentType,
+      maxChars: 2000, // Use first 2KB of content for ID generation
+    }) as UUID;
+
     logger.info(
-      `KnowledgeService (agent: ${agentId}) processing document for public addKnowledge: ${options.originalFilename}, type: ${options.contentType}`
+      `KnowledgeService processing document for agent: ${agentId}, file: ${options.originalFilename}, type: ${options.contentType}, generated ID: ${contentBasedId}`
     );
 
-    // Check if document already exists in database using clientDocumentId as the primary key for "documents" table
+    // Check if document already exists in database using content-based ID
     try {
-      // The `getMemoryById` in runtime usually searches generic memories.
-      // We need a way to specifically query the 'documents' table or ensure clientDocumentId is unique across all memories if used as ID.
-      // For now, assuming clientDocumentId is the ID used when creating document memory.
-      const existingDocument = await this.runtime.getMemoryById(options.clientDocumentId);
+      const existingDocument = await this.runtime.getMemoryById(contentBasedId);
       if (existingDocument && existingDocument.metadata?.type === MemoryType.DOCUMENT) {
         logger.info(
-          `Document ${options.originalFilename} with ID ${options.clientDocumentId} already exists. Skipping processing.`
+          `Document ${options.originalFilename} with ID ${contentBasedId} already exists. Skipping processing.`
         );
 
         // Count existing fragments for this document
         const fragments = await this.runtime.getMemories({
           tableName: 'knowledge',
-          // Assuming fragments store original documentId in metadata.documentId
-          // This query might need adjustment based on actual fragment metadata structure.
-          // A more robust way would be to query where metadata.documentId === options.clientDocumentId
         });
 
         // Filter fragments related to this specific document
         const relatedFragments = fragments.filter(
           (f) =>
             f.metadata?.type === MemoryType.FRAGMENT &&
-            (f.metadata as FragmentMetadata).documentId === options.clientDocumentId
+            (f.metadata as FragmentMetadata).documentId === contentBasedId
         );
 
         return {
-          clientDocumentId: options.clientDocumentId,
+          clientDocumentId: contentBasedId,
           storedDocumentMemoryId: existingDocument.id as UUID,
           fragmentCount: relatedFragments.length,
         };
@@ -209,11 +234,15 @@ export class KnowledgeService extends Service {
     } catch (error) {
       // Document doesn't exist or other error, continue with processing
       logger.debug(
-        `Document ${options.clientDocumentId} not found or error checking existence, proceeding with processing: ${error instanceof Error ? error.message : String(error)}`
+        `Document ${contentBasedId} not found or error checking existence, proceeding with processing: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 
-    return this.processDocument(options);
+    // Process the document with the content-based ID
+    return this.processDocument({
+      ...options,
+      clientDocumentId: contentBasedId,
+    });
   }
 
   /**
@@ -222,6 +251,7 @@ export class KnowledgeService extends Service {
    * @returns Promise with document processing result
    */
   private async processDocument({
+    agentId: passedAgentId,
     clientDocumentId,
     contentType,
     originalFilename,
@@ -229,16 +259,18 @@ export class KnowledgeService extends Service {
     content,
     roomId,
     entityId,
+    metadata,
   }: AddKnowledgeOptions): Promise<{
     clientDocumentId: string;
     storedDocumentMemoryId: UUID;
     fragmentCount: number;
   }> {
-    const agentId = this.runtime.agentId as UUID;
+    // Use agentId from options if provided (from frontend), otherwise fall back to runtime
+    const agentId = passedAgentId || (this.runtime.agentId as UUID);
 
     try {
       logger.debug(
-        `KnowledgeService: Processing document ${originalFilename} (type: ${contentType}) via processDocument`
+        `KnowledgeService: Processing document ${originalFilename} (type: ${contentType}) via processDocument for agent: ${agentId}`
       );
 
       let fileBuffer: Buffer | null = null;
@@ -276,11 +308,7 @@ export class KnowledgeService extends Service {
         // Routes always send base64, but docs-loader sends plain text
 
         // First, check if this looks like base64
-        const base64Regex = /^[A-Za-z0-9+/]+=*$/;
-        const looksLikeBase64 =
-          content && content.length > 0 && base64Regex.test(content.replace(/\s/g, ''));
-
-        if (looksLikeBase64) {
+        if (looksLikeBase64(content)) {
           try {
             // Try to decode from base64
             const decodedBuffer = Buffer.from(content, 'base64');
@@ -334,14 +362,23 @@ export class KnowledgeService extends Service {
         worldId,
         fileSize: fileBuffer ? fileBuffer.length : extractedText.length,
         documentId: clientDocumentId, // Explicitly set documentId in metadata as well
+        customMetadata: metadata, // Pass the custom metadata
       });
 
       const memoryWithScope = {
         ...documentMemory,
         id: clientDocumentId, // Ensure the ID of the memory is the clientDocumentId
+        agentId: agentId,
         roomId: roomId || agentId,
         entityId: entityId || agentId,
       };
+
+      logger.debug(
+        `KnowledgeService: Creating memory with agentId=${agentId}, entityId=${entityId}, roomId=${roomId}, this.runtime.agentId=${this.runtime.agentId}`
+      );
+      logger.debug(
+        `KnowledgeService: memoryWithScope agentId=${memoryWithScope.agentId}, entityId=${memoryWithScope.entityId}`
+      );
 
       await this.runtime.createMemory(memoryWithScope, 'documents');
 
@@ -441,9 +478,11 @@ export class KnowledgeService extends Service {
     const processingPromises = items.map(async (item) => {
       await this.knowledgeProcessingSemaphore.acquire();
       try {
-        // For character knowledge, the item itself (string) is the source.
-        // A unique ID is generated from this string content.
-        const knowledgeId = createUniqueUuid(this.runtime.agentId + item, item); // Use agentId in seed for uniqueness
+        // Generate content-based ID for character knowledge
+        const knowledgeId = generateContentBasedId(item, this.runtime.agentId, {
+          maxChars: 2000, // Use first 2KB of content
+          includeFilename: 'character-knowledge', // A constant identifier for character knowledge
+        }) as UUID;
 
         if (await this.checkExistingKnowledge(knowledgeId)) {
           logger.debug(
@@ -482,7 +521,7 @@ export class KnowledgeService extends Service {
         // Using _internalAddKnowledge for character knowledge
         await this._internalAddKnowledge(
           {
-            id: knowledgeId, // Use the content-derived ID
+            id: knowledgeId, // Use the content-based ID
             content: {
               text: item,
             },
@@ -658,22 +697,14 @@ export class KnowledgeService extends Service {
    * Corresponds to GET /plugins/knowledge/documents
    */
   async getMemories(params: {
-    tableName: string; // Should be 'documents' for this service's context
-    // agentId is implicit from this.runtime.agentId
+    tableName: string; // Should be 'documents' or 'knowledge' for this service
     roomId?: UUID;
     count?: number;
     end?: number; // timestamp for "before"
   }): Promise<Memory[]> {
-    if (params.tableName !== 'documents') {
-      logger.warn(
-        `KnowledgeService.getMemories called with tableName ${params.tableName}, but this service primarily manages 'documents'. Proceeding, but review usage.`
-      );
-      // Allow fetching from other tables if runtime.getMemories supports it broadly,
-      // but log a warning.
-    }
     return this.runtime.getMemories({
       ...params, // includes tableName, roomId, count, end
-      agentId: this.runtime.agentId, // Ensure agentId is correctly scoped
+      agentId: this.runtime.agentId,
     });
   }
 

@@ -1,4 +1,4 @@
-import { ModelConfig, ModelConfigSchema, ProviderRateLimits, KnowledgeConfig } from './types.ts';
+import { ModelConfig, ModelConfigSchema, ProviderRateLimits } from './types.ts';
 import z from 'zod';
 import { logger, IAgentRuntime } from '@elizaos/core';
 
@@ -21,57 +21,45 @@ export function validateModelConfig(runtime?: IAgentRuntime): ModelConfig {
     const ctxKnowledgeEnabled = getSetting('CTX_KNOWLEDGE_ENABLED') === 'true';
     logger.debug(`Configuration: CTX_KNOWLEDGE_ENABLED=${ctxKnowledgeEnabled}`);
 
-    // If EMBEDDING_PROVIDER is not provided, assume we're using plugin-openai
+    // If EMBEDDING_PROVIDER is not provided, assume we're using akash-chat
     const embeddingProvider = getSetting('EMBEDDING_PROVIDER');
-    const assumePluginOpenAI = !embeddingProvider;
+    const assumeAkashChat = !embeddingProvider;
 
-    if (assumePluginOpenAI) {
-      const openaiApiKey = getSetting('OPENAI_API_KEY');
-      const openaiEmbeddingModel = getSetting('OPENAI_EMBEDDING_MODEL');
+    if (assumeAkashChat) {
+      const akashChatApiKey = getSetting('AKASH_CHAT_API_KEY');
+      const embeddingModel = getSetting('TEXT_EMBEDDING_MODEL');
 
-      if (openaiApiKey && openaiEmbeddingModel) {
-        logger.info('EMBEDDING_PROVIDER not specified, using configuration from plugin-openai');
+      if (akashChatApiKey && embeddingModel) {
+        logger.debug('EMBEDDING_PROVIDER not specified, using configuration from akash-chat');
       } else {
-        logger.warn(
-          'EMBEDDING_PROVIDER not specified, but plugin-openai configuration incomplete. Check OPENAI_API_KEY and OPENAI_EMBEDDING_MODEL.'
+        logger.debug(
+          'EMBEDDING_PROVIDER not specified. Assuming embeddings are provided by another plugin.'
         );
       }
     }
 
-    // Set embedding provider defaults based on plugin-openai if EMBEDDING_PROVIDER is not set
-    const finalEmbeddingProvider = embeddingProvider || 'openai';
+    // Only set embedding provider if explicitly configured
+    // If not set, let the runtime handle embeddings (e.g., plugin-google-genai)
+    const finalEmbeddingProvider = embeddingProvider;
+
     const textEmbeddingModel =
       getSetting('TEXT_EMBEDDING_MODEL') ||
-      getSetting('OPENAI_EMBEDDING_MODEL') ||
-      (finalEmbeddingProvider === 'akash' ? 'BAAI-bge-large-en-v1-5' : 'text-embedding-3-small');
+      'BAAI-bge-large-en-v1-5';
     const embeddingDimension =
-      getSetting('EMBEDDING_DIMENSION') || 
-      getSetting('OPENAI_EMBEDDING_DIMENSIONS') || 
-      (finalEmbeddingProvider === 'akash' ? '1024' : '1536');
+      getSetting('EMBEDDING_DIMENSION') || '1024';
 
-    // Use OpenAI API key from runtime settings
-    const openaiApiKey = getSetting('OPENAI_API_KEY');
-    // Use Akash Chat API key from runtime settings
-    const akashChatApiKey = getSetting('AKASH_CHAT_API_KEY');
-
+    // Remove legacy OpenAI configuration
+    
     const config = ModelConfigSchema.parse({
       EMBEDDING_PROVIDER: finalEmbeddingProvider,
       TEXT_PROVIDER: getSetting('TEXT_PROVIDER'),
 
-      OPENAI_API_KEY: openaiApiKey,
-      ANTHROPIC_API_KEY: getSetting('ANTHROPIC_API_KEY'),
-      OPENROUTER_API_KEY: getSetting('OPENROUTER_API_KEY'),
-      GOOGLE_API_KEY: getSetting('GOOGLE_API_KEY'),
-      AKASH_CHAT_API_KEY: akashChatApiKey,
-
-      OPENAI_BASE_URL: getSetting('OPENAI_BASE_URL'),
-      ANTHROPIC_BASE_URL: getSetting('ANTHROPIC_BASE_URL'),
-      OPENROUTER_BASE_URL: getSetting('OPENROUTER_BASE_URL'),
-      GOOGLE_BASE_URL: getSetting('GOOGLE_BASE_URL'),
-      AKASH_CHAT_BASE_URL: getSetting('AKASH_CHAT_BASE_URL', 'https://chatapi.akash.network/api/v1'),
+      AKASH_CHAT_API_KEY: getSetting('AKASH_CHAT_API_KEY'),
+      AKASH_CHAT_BASE_URL: getSetting('AKASH_CHAT_BASE_URL') || 'https://chatapi.akash.network/api/v1',
 
       TEXT_EMBEDDING_MODEL: textEmbeddingModel,
-      TEXT_MODEL: getSetting('TEXT_MODEL'),
+      TEXT_MODEL: getSetting('TEXT_MODEL') || 'Meta-Llama-3-1-8B-Instruct-FP8',
+      CTX_KNOWLEDGE_MODEL: getSetting('CTX_KNOWLEDGE_MODEL') || 'DeepSeek-R1-Distill-Llama-70B',
 
       MAX_INPUT_TOKENS: getSetting('MAX_INPUT_TOKENS', '4000'),
       MAX_OUTPUT_TOKENS: getSetting('MAX_OUTPUT_TOKENS', '4096'),
@@ -81,7 +69,7 @@ export function validateModelConfig(runtime?: IAgentRuntime): ModelConfig {
       CTX_KNOWLEDGE_ENABLED: ctxKnowledgeEnabled,
     });
 
-    validateConfigRequirements(config, assumePluginOpenAI);
+    validateConfigRequirements(config, assumeAkashChat);
     return config;
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -95,141 +83,40 @@ export function validateModelConfig(runtime?: IAgentRuntime): ModelConfig {
 }
 
 /**
- * Get the knowledge configuration from runtime settings
- * @param runtime The agent runtime to get settings from
- * @param config Optional existing config object to extend
- * @returns The knowledge configuration
- */
-export function getKnowledgeConfig(
-  runtime?: IAgentRuntime,
-  config?: Record<string, string>
-): KnowledgeConfig {
-  // Helper function to get setting from runtime, config, or fallback to process.env
-  const getSetting = (key: string, defaultValue?: string) => {
-    if (runtime) {
-      return runtime.getSetting(key) || config?.[key] || process.env[key] || defaultValue;
-    }
-    return config?.[key] || process.env[key] || defaultValue;
-  };
-
-  // Get knowledge configuration settings
-  return {
-    CTX_KNOWLEDGE_ENABLED: getSetting('CTX_KNOWLEDGE_ENABLED') === 'true',
-    LOAD_DOCS_ON_STARTUP: getSetting('LOAD_DOCS_ON_STARTUP') !== 'false',
-    MAX_INPUT_TOKENS: getSetting('MAX_INPUT_TOKENS', '4000'),
-    MAX_OUTPUT_TOKENS: getSetting('MAX_OUTPUT_TOKENS', '4096'),
-    EMBEDDING_PROVIDER: getSetting('EMBEDDING_PROVIDER'),
-    TEXT_PROVIDER: getSetting('TEXT_PROVIDER'),
-    TEXT_EMBEDDING_MODEL: getSetting('TEXT_EMBEDDING_MODEL'),
-    
-    // Git repository settings
-    DOCS_REPOS: getSetting('DOCS_REPOS'),
-    
-    // Individual repository configurations
-    DOCS_REPO_1_URL: getSetting('DOCS_REPO_1_URL'),
-    DOCS_REPO_1_PATH: getSetting('DOCS_REPO_1_PATH'),
-    DOCS_REPO_1_BRANCH: getSetting('DOCS_REPO_1_BRANCH'),
-    DOCS_REPO_1_DOCS_PATH: getSetting('DOCS_REPO_1_DOCS_PATH'),
-  };
-}
-
-/**
  * Validates the required API keys and configuration based on the selected mode
  * @param config The model configuration to validate
- * @param assumePluginOpenAI Whether we're assuming plugin-openai is being used
+ * @param assumeAkashChat Whether we're assuming akash-chat is being used
  * @throws Error if a required configuration value is missing
  */
-function validateConfigRequirements(config: ModelConfig, assumePluginOpenAI: boolean): void {
-  // Skip validation for embedding provider if we're using plugin-openai's configuration
-  if (!assumePluginOpenAI) {
-    // Only validate embedding provider if not using plugin-openai
-    if (config.EMBEDDING_PROVIDER === 'openai' && !config.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is required when EMBEDDING_PROVIDER is set to "openai"');
-    }
-    if (config.EMBEDDING_PROVIDER === 'google' && !config.GOOGLE_API_KEY) {
-      throw new Error('GOOGLE_API_KEY is required when EMBEDDING_PROVIDER is set to "google"');
-    }
-    if (config.EMBEDDING_PROVIDER === 'akash' && !config.AKASH_CHAT_API_KEY) {
-      throw new Error('AKASH_CHAT_API_KEY is required when EMBEDDING_PROVIDER is set to "akash"');
-    }
-  } else {
-    // If we're assuming plugin-openai, make sure we have the required values
-    if (!config.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is required when using plugin-openai configuration');
-    }
-    if (!config.TEXT_EMBEDDING_MODEL) {
-      throw new Error('OPENAI_EMBEDDING_MODEL is required when using plugin-openai configuration');
-    }
+function validateConfigRequirements(config: ModelConfig, assumeAkashChat: boolean): void {
+  // Only validate embedding requirements if EMBEDDING_PROVIDER is explicitly set
+  const embeddingProvider = config.EMBEDDING_PROVIDER;
+
+  // If EMBEDDING_PROVIDER is explicitly set, validate its requirements
+  if (embeddingProvider === 'akash-chat' && !config.AKASH_CHAT_API_KEY) {
+    throw new Error('AKASH_CHAT_API_KEY is required when EMBEDDING_PROVIDER is set to "akash-chat"');
+  }
+
+  // If no embedding provider is set, skip validation - let runtime handle it
+  if (!embeddingProvider) {
+    logger.debug('No EMBEDDING_PROVIDER specified. Embeddings will be handled by the runtime.');
   }
 
   // If Contextual Knowledge is enabled, we need additional validations
   if (config.CTX_KNOWLEDGE_ENABLED) {
-    logger.info('Contextual Knowledge is enabled. Validating text generation settings...');
-
-    // Text provider and model are required for CTX_RAG
-    if (!config.TEXT_PROVIDER) {
-      throw new Error('TEXT_PROVIDER is required when CTX_KNOWLEDGE_ENABLED is true');
-    }
-
-    if (!config.TEXT_MODEL) {
-      throw new Error('TEXT_MODEL is required when CTX_KNOWLEDGE_ENABLED is true');
-    }
+    logger.debug('Contextual Knowledge is enabled. Validating text generation settings...');
 
     // Validate API keys based on the text provider
-    if (config.TEXT_PROVIDER === 'openai' && !config.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is required when TEXT_PROVIDER is set to "openai"');
-    }
-    if (config.TEXT_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is required when TEXT_PROVIDER is set to "anthropic"');
-    }
-    if (config.TEXT_PROVIDER === 'openrouter' && !config.OPENROUTER_API_KEY) {
-      throw new Error('OPENROUTER_API_KEY is required when TEXT_PROVIDER is set to "openrouter"');
-    }
-    if (config.TEXT_PROVIDER === 'google' && !config.GOOGLE_API_KEY) {
-      throw new Error('GOOGLE_API_KEY is required when TEXT_PROVIDER is set to "google"');
-    }
-    if (config.TEXT_PROVIDER === 'akash' && !config.AKASH_CHAT_API_KEY) {
-      throw new Error('AKASH_CHAT_API_KEY is required when TEXT_PROVIDER is set to "akash"');
+    if (config.TEXT_PROVIDER === 'akash-chat' && !config.AKASH_CHAT_API_KEY) {
+      throw new Error('AKASH_CHAT_API_KEY is required when TEXT_PROVIDER is set to "akash-chat"');
     }
 
-    // If using OpenRouter with Claude or Gemini models, check for additional recommended configurations
-    if (config.TEXT_PROVIDER === 'openrouter') {
-      const modelName = config.TEXT_MODEL?.toLowerCase() || '';
-      if (modelName.includes('claude') || modelName.includes('gemini')) {
-        logger.info(
-          `Using ${modelName} with OpenRouter. This configuration supports document caching for improved performance.`
-        );
-      }
-    }
-    
-    // If using Akash Chat API, enable caching for supported models
-    if (config.TEXT_PROVIDER === 'openai' && config.OPENAI_BASE_URL?.includes('chatapi.akash.network')) {
-      const modelName = config.TEXT_MODEL?.toLowerCase() || '';
-      if (modelName.includes('deepseek') || modelName.includes('llama') || modelName.includes('qwen')) {
-        logger.info(
-          `Using ${modelName} with Akash Chat API. This configuration supports document caching for improved performance.`
-        );
-      }
-    }
-    
-    // If using akash text provider directly
-    if (config.TEXT_PROVIDER === 'akash') {
-      const modelName = config.TEXT_MODEL?.toLowerCase() || '';
-      if (modelName.includes('deepseek') || modelName.includes('llama') || modelName.includes('qwen')) {
-        logger.info(
-          `Using ${modelName} with Akash Chat API. This configuration supports document caching for improved performance.`
-        );
-      }
+    // Validate that TEXT_MODEL is provided for akash-chat
+    if (config.TEXT_PROVIDER === 'akash-chat' && !config.TEXT_MODEL) {
+      throw new Error('TEXT_MODEL is required when TEXT_PROVIDER is set to "akash-chat"');
     }
   } else {
-    // Log appropriate message based on where embedding config came from
-    if (assumePluginOpenAI) {
-      logger.info(
-        'Contextual Knowledge is disabled. Using embedding configuration from plugin-openai.'
-      );
-    } else {
-      logger.info('Contextual Knowledge is disabled. Using basic embedding-only configuration.');
-    }
+    logger.debug('Contextual Knowledge is disabled. Using configured provider for embeddings only.');
   }
 }
 
@@ -257,32 +144,13 @@ export async function getProviderRateLimits(runtime?: IAgentRuntime): Promise<Pr
 
   // Provider-specific rate limits
   switch (config.EMBEDDING_PROVIDER) {
-    case 'openai':
-      // OpenAI typically allows 150,000 tokens per minute for embeddings
-      // and up to 3,000 RPM for Tier 4+ accounts
+    case 'akash-chat':
+      // Akash Chat API rate limits
       return {
         maxConcurrentRequests,
-        requestsPerMinute: Math.min(requestsPerMinute, 3000),
-        tokensPerMinute: Math.min(tokensPerMinute, 150000),
-        provider: 'openai',
-      };
-
-    case 'google':
-      // Google's default is 60 requests per minute
-      return {
-        maxConcurrentRequests,
-        requestsPerMinute: Math.min(requestsPerMinute, 60),
+        requestsPerMinute: Math.min(requestsPerMinute, 100),
         tokensPerMinute: Math.min(tokensPerMinute, 100000),
-        provider: 'google',
-      };
-      
-    case 'akash':
-      // Akash Chat API rate limits - using more aggressive defaults
-      return {
-        maxConcurrentRequests: Math.min(maxConcurrentRequests, 100),
-        requestsPerMinute: Math.min(requestsPerMinute, 500),
-        tokensPerMinute: Math.min(tokensPerMinute, 500000),
-        provider: 'akash',
+        provider: 'akash-chat',
       };
 
     default:
@@ -291,7 +159,7 @@ export async function getProviderRateLimits(runtime?: IAgentRuntime): Promise<Pr
         maxConcurrentRequests,
         requestsPerMinute,
         tokensPerMinute,
-        provider: config.EMBEDDING_PROVIDER,
+        provider: config.EMBEDDING_PROVIDER || 'akash-chat',
       };
   }
 }

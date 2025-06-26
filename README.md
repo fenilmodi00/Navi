@@ -1,6 +1,8 @@
 # 🚀 Navi-Akash
 
-> A powerful Discord bot for Akash Network powered by elizaOS
+> A powrdbot for Ah Nrk ---
+
+## 🎯 Complete Action Reference
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node/Bun](https://img.shields.io/badge/Node.js-Bun-green.svg)](https://bun.sh/)
@@ -18,106 +20,60 @@ Navi-Akash is an intelligent developer support agent for Akash Network that live
 - 🎵 **Voice Support**: Can join voice channels for assistance
 - 📎 **Media Handling**: Can process attachments and transcribe media
 - 🧠 **Akash Chat API**: Uses Akash's own AI infrastructure for responses
-- 🏗️ **SDL Builder**: Advanced SDL template generation and validation for Akash deployments
-- Built-in documentation and examples
+- 🌐 **Akash Network Integration**: Provider information, network stats, and pricing data
 
 ---
 
-## 🏗️ SDL Builder Plugin
+## 🎯 Complete Action Reference
 
-The **plugin-sdl-builder** is a powerful tool for generating and validating Akash Network deployment manifests (SDL files). It automates the complex process of creating deployment configurations.
+Navi supports a comprehensive set of actions for Akash Network operations:
 
-### ✨ SDL Builder Features
+### 📋 Provider Actions
+| Action | Trigger Examples | Description |
+|--------|------------------|-------------|
+| `GET_PROVIDERS_LIST` | "show providers", "list A100 providers", "RTX4090 providers" | Lists and filters providers by GPU model, region, or status |
+| `GET_PROVIDER_INFO` | "provider info akash1...", "check provider details" | Gets detailed information about a specific provider |
 
-🚀 **Smart SDL Generation**
-- Automatic template selection based on deployment type
-- Resource optimization suggestions
-- Cost estimation and comparisons
+### 💰 Pricing Actions
+| Action | Trigger Examples | Description |
+|--------|------------------|-------------|
+| `GET_GPU_PRICING` | "GPU pricing", "A100 costs", "pricing for 2 CPU 4GB" | Real-time GPU and resource pricing |
+| `COMPARE_COSTS` | "Akash vs AWS costs", "compare pricing", "how much savings" | Cost comparison with traditional cloud providers |
 
-🔍 **Advanced Validation**  
-- Structure validation with detailed error reporting
-- Performance optimization suggestions
-- Security best practices recommendations
+### 📊 Network Actions
+| Action | Trigger Examples | Description |
+|--------|------------------|-------------|
+| `GET_NETWORK_STATS` | "network stats", "Akash statistics", "network overview" | Current network statistics and health metrics |
 
-📋 **Template Library**
-- Web applications (basic, intermediate, advanced)
-- AI/ML deployments with GPU support
-- Blockchain nodes and ElizaOS agents
-- Database deployments (PostgreSQL, MySQL, Redis)
-- Gaming servers and media streaming
-- Enterprise microservices
+### 🏗️ SDL Actions
+| Action | Trigger Examples | Description |
+|--------|------------------|-------------|
+| `GET_SDL_TEMPLATE` | "create SDL", "generate web app SDL", "AI deployment" | Generates custom SDL templates for various use cases |
+| `VALIDATE_SDL` | "validate SDL", "check my manifest", "validate this YAML" | Validates and optimizes SDL configurations |
 
-💰 **Cost Optimization**
-- Real-time pricing estimates
-- Provider comparison
-- Resource allocation optimization
+### 📚 Educational Actions
+| Action | Trigger Examples | Description |
+|--------|------------------|-------------|
+| `GET_TUTORIAL` | "how to deploy", "deployment tutorial", "getting started" | Step-by-step tutorials and guides |
 
-### 🎯 How to Use SDL Builder
+### 🎯 Smart Action Detection
 
-Simply ask Navi to create deployments using natural language:
+Navi automatically detects the right action based on your natural language queries:
 
-```
-"Create an SDL for a React web app with 2GB RAM"
-"Generate AI deployment with GPU for PyTorch"
-"Make a PostgreSQL database deployment"
-"Create an advanced ElizaOS agent deployment"
-"Build a gaming server with high CPU"
-```
+**GPU Model Detection:**
+- Automatically identifies GPU models (A100, H100, RTX4090, etc.) in your queries
+- Filters providers and pricing based on detected models
+- Prioritizes active providers for specific GPU requests
 
-### 📝 Example SDL Generation
+**Resource Specification:**
+- Parses CPU, memory, and storage requirements from natural language
+- Generates appropriate SDL configurations based on your specs
+- Provides cost estimates for specified resources
 
-**User Request:**
-```
-"I need an advanced AI deployment with GPU support for a machine learning model"
-```
-
-**Navi Response:**
-```yaml
-# Generated SDL with optimized GPU configuration
-version: "2.0"
-services:
-  ai-model:
-    image: pytorch/pytorch:latest
-    expose:
-      - port: 8080
-        as: 80
-        to:
-          - global: true
-    env:
-      - NVIDIA_VISIBLE_DEVICES=all
-profiles:
-  compute:
-    ai-model:
-      resources:
-        cpu:
-          units: 4
-        memory:
-          size: 8Gi
-        gpu:
-          units: 1
-          attributes:
-            vendor:
-              nvidia:
-                - model: rtx4090
-        storage:
-          - size: 50Gi
-```
-
-### 🔧 SDL Validation
-
-Navi can also validate existing SDL files:
-
-```
-"Validate this SDL" (attach your SDL file)
-"Check my deployment configuration"
-"Optimize this SDL for cost"
-```
-
-The plugin will provide:
-- ✅ Validation results
-- 💡 Optimization suggestions  
-- 💰 Cost estimates
-- 🔒 Security recommendations
+**Intent Recognition:**
+- Distinguishes between provider lookup, pricing queries, and deployment requests
+- Handles follow-up questions and context-aware responses
+- Escalates complex queries to @Akash Vanguards when needed
 
 ---
 
@@ -126,11 +82,12 @@ The plugin will provide:
 - **Runtime**: [Bun.js](https://bun.sh/) / Node.js (18+)
 - **Framework**: [elizaOS](https://github.com/elizaOS/eliza)
 - **Plugins**:
-  - **plugin-akash-chat**: Handles Akash Network specific chat functionality
-  - **plugin-discord**: Manages Discord integration
-  - **plugin-knowledge**: Provides knowledge base functionality
-  - **plugin-web-search**: Enables web search capabilities
-  - **plugin-sdl-builder**: Advanced SDL template generation and validation
+  - **plugin-akash**: Complete Akash Network functionality and provider information
+  - **plugin-akash-chat**: Handles Akash Network specific chat functionality with Akash Chat API
+  - **plugin-discord**: Manages Discord integration and bot interactions
+  - **plugin-knowledge**: Provides knowledge base functionality and semantic search
+  - **plugin-web-search**: Enables web search capabilities via Tavily API
+
 
 ---
 
@@ -284,7 +241,57 @@ npm run dev
 
 ---
 
-## 🐳 Docker Deployment (Alternative)
+## � Extensibility & Future Development
+
+### 🔌 Plugin Architecture
+
+Navi is built on the ElizaOS plugin system, making it highly extensible:
+
+**Current Plugin Ecosystem:**
+- **Core Plugins**: Akash, Discord, Knowledge Base, Web Search
+- **Modular Design**: Each plugin provides specific functionality independently
+- **Hot-Pluggable**: Plugins can be enabled/disabled without core changes
+- **Standardized APIs**: All plugins follow ElizaOS action/provider patterns
+
+### 🛣️ Future Capabilities
+
+**Planned Enhancements:**
+- **Advanced Deployment Monitoring**: Real-time deployment status tracking
+- **Multi-Network Support**: Testnet/mainnet switching capabilities  
+- **Enhanced Analytics**: Historical pricing trends and provider performance metrics
+- **Community Features**: Provider reviews, deployment templates sharing
+- **Advanced SDL Features**: Complex multi-service deployments, service mesh configurations
+
+**Potential Plugin Extensions:**
+- **Wallet Integration**: Secure deployment transaction support (for advanced users)
+- **Deployment Automation**: Automated SDL deployment pipelines
+- **Monitoring Dashboards**: Real-time deployment health and metrics
+- **Cost Optimization**: AI-powered resource allocation recommendations
+- **Provider Analytics**: Deep provider performance and reliability analysis
+
+### 👥 Contributing to Navi
+
+**Plugin Development:**
+- Follow ElizaOS plugin patterns and interfaces
+- Maintain public-safe, read-only operations for core bot functionality
+- Implement comprehensive error handling and user feedback
+- Include thorough testing and documentation
+
+**Code Standards:**
+- TypeScript with strict mode for type safety
+- Comprehensive error handling with user-friendly messages
+- Rate limiting and API quota management
+- Security-first approach for all external integrations
+
+**Testing Requirements:**
+- Unit tests for all action handlers and validation logic
+- Integration tests with real Akash Network data
+- End-to-end testing in Discord environment
+- Performance testing for high-volume usage scenarios
+
+---
+
+## �🐳 Docker Deployment (Alternative)
 
 If you prefer Docker:
 
@@ -303,26 +310,32 @@ docker-compose up -d --build
 
 ```
 navi-akash/
-├── plugins/                  # Plugin directories
-│   ├── plugin-akash-chat/    # Akash Network functionality
-│   ├── plugin-discord/       # Discord integration
-│   ├── plugin-knowledge/     # Knowledge base
-│   ├── plugin-web-search/    # Web search capabilities
-│   └── plugin-sdl-builder/   # SDL template generation and validation
-├── src/                      # Main application code
-│   ├── index.ts              # Main entry point
-│   ├── plugin.ts             # Plugin configuration
-│   ├── lib/                  # Shared libraries
-│   ├── types/                # TypeScript types
-│   └── utils/                # Utility functions
-├── data/                     # Data storage
-│   └── akash-knowledge-base/ # Knowledge base data
-├── dist/                     # Built output
-├── .env.example              # Environment template
-├── package.json              # Dependencies and scripts
-├── tsconfig.json             # TypeScript configuration
-├── docker-compose.yml        # Docker Compose configuration
-└── Dockerfile                # Docker image configuration
+├── plugins/                       # Plugin directories
+│   ├── plugin-akash/             # Complete Akash Network functionality
+│   │   ├── src/actions/          # Provider info, pricing, SDL validation
+│   │   ├── src/providers/        # Network data providers
+│   │   └── src/utils/            # Akash-specific utilities
+│   ├── plugin-akash-chat/        # Akash Chat API integration
+│   ├── plugin-discord/           # Discord bot integration
+│   ├── plugin-knowledge/         # Knowledge base and semantic search
+│   ├── plugin-web-search/        # Web search capabilities
+
+├── src/                          # Main application code
+│   ├── index.ts                  # Main entry point and character configuration
+│   ├── plugin.ts                 # Plugin configuration and initialization
+│   ├── lib/                      # Shared libraries and utilities
+│   ├── types/                    # TypeScript type definitions
+│   └── utils/                    # Application utility functions
+├── data/                         # Data storage and knowledge base
+│   └── akash-knowledge-base/     # Comprehensive Akash documentation
+├── dist/                         # Built output files
+├── .env.example                  # Environment variables template
+├── package.json                  # Dependencies and build scripts
+├── tsconfig.json                 # TypeScript configuration
+├── docker-compose.yml            # Docker Compose configuration
+├── Dockerfile                    # Docker image configuration
+├── deploy.yaml                   # Akash Network SDL deployment manifest
+└── README.md                     # This documentation file
 ```
 
 ---
@@ -391,7 +404,7 @@ See `.env.example` for a complete template.
 To deploy Navi-Akash on Akash Network, you can either:
 
 1. **Use the pre-built SDL template** (`deploy.yaml`) provided in this repository
-2. **Ask Navi to generate a custom SDL** using the SDL Builder plugin
+2. **Ask Navi to generate a custom SDL** via natural language
 
 ### 🏗️ Generate SDL with Navi
 
@@ -463,7 +476,7 @@ services:
       - DISCORD_ENABLE_WEB_SEARCH=true
       - CTX_KNOWLEDGE_ENABLED=false
       - LOAD_DOCS_ON_STARTUP=true
-      - EMBEDDING_PROVIDER=akash
+      - EMBEDDING_PROVIDER=akash-chat
       - TEXT_EMBEDDING_MODEL=BAAI-bge-large-en-v1-5
       - EMBEDDING_DIMENSION=1024
       - MAX_CONCURRENT_REQUESTS=50
