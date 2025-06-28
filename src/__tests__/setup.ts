@@ -1,4 +1,4 @@
-import { beforeAll, afterAll } from 'vitest';
+import { beforeAll, afterAll, vi } from 'vitest';
 import dotenv from 'dotenv';
 
 // Load test environment variables
@@ -7,6 +7,33 @@ dotenv.config({ path: '.env.test' });
 // Set default test environment variables
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'error';
+
+// Mock @elizaos/core module for unit tests
+vi.mock('@elizaos/core', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  elizaLogger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  generateId: vi.fn(() => 'test-id'),
+  validateCharacterConfig: vi.fn(() => true),
+  createMockRuntime: vi.fn(() => ({
+    agentId: 'test-agent-id',
+    character: { name: 'Test Agent', plugins: [] },
+    getService: vi.fn(),
+    getSetting: vi.fn(),
+    actions: [],
+    providers: [],
+    evaluators: [],
+  })),
+}));
 
 // Mock external APIs for testing
 beforeAll(() => {

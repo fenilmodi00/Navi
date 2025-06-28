@@ -6,12 +6,16 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./src/__tests__/setup.ts'],
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'plugins/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
+    ],
     exclude: [
       'node_modules',
       'dist',
       'plugins/*/node_modules',
-      'plugins/*/dist'
+      'plugins/*/dist',
+      '**/*.e2e.test.ts'
     ],
     testTimeout: 30000,
     hookTimeout: 30000,
@@ -40,7 +44,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@/plugins': path.resolve(__dirname, './plugins')
+      '@/plugins': path.resolve(__dirname, './plugins'),
+      '@elizaos/core': path.resolve(__dirname, './node_modules/@elizaos/core')
     }
   },
   esbuild: {
