@@ -1,6 +1,6 @@
 # 🚀 Navi-Akash
 
-> A powrdbot for Ah Nrk ---
+
 
 ## 🎯 Complete Action Reference
 
