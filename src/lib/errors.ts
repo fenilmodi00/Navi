@@ -1,14 +1,20 @@
 export class NaviError extends Error {
-  constructor(message: string, public context?: Record<string, any>) {
+  constructor(
+    message: string,
+    public context?: Record<string, any>,
+  ) {
     super(message);
-    this.name = 'NaviError';
+    this.name = "NaviError";
   }
 }
 
 export class AkashNetworkError extends NaviError {
-  constructor(message: string, public operation?: string) {
+  constructor(
+    message: string,
+    public operation?: string,
+  ) {
     super(message);
-    this.name = 'AkashNetworkError';
+    this.name = "AkashNetworkError";
   }
 }
 
@@ -16,24 +22,30 @@ export class PluginLoadError extends NaviError {
   constructor(
     message: string,
     public pluginName: string,
-    public cause?: Error
+    public cause?: Error,
   ) {
     super(message);
-    this.name = 'PluginLoadError';
+    this.name = "PluginLoadError";
   }
 }
 
 export class ConfigurationError extends NaviError {
-  constructor(message: string, public configType?: string) {
+  constructor(
+    message: string,
+    public configType?: string,
+  ) {
     super(message);
-    this.name = 'ConfigurationError';
+    this.name = "ConfigurationError";
   }
 }
 
 export class DatabaseConnectionError extends NaviError {
-  constructor(message: string, public connectionString?: string) {
+  constructor(
+    message: string,
+    public connectionString?: string,
+  ) {
     super(message);
-    this.name = 'DatabaseConnectionError';
+    this.name = "DatabaseConnectionError";
   }
 }
 
@@ -48,7 +60,7 @@ export function handleNaviError(error: unknown): never {
     console.error(`❌ Plugin load failed: ${error.message}`);
     console.error(`Plugin: ${error.pluginName}`);
     if (error.cause) {
-      console.error('Caused by:', error.cause.message);
+      console.error("Caused by:", error.cause.message);
     }
   } else if (error instanceof ConfigurationError) {
     console.error(`❌ Configuration error: ${error.message}`);
@@ -57,10 +69,12 @@ export function handleNaviError(error: unknown): never {
     }
   } else if (error instanceof DatabaseConnectionError) {
     console.error(`❌ Database connection error: ${error.message}`);
-    console.error('💡 Check your database configuration in .env file');
+    console.error("💡 Check your database configuration in .env file");
   } else {
-    console.error(`❌ Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `❌ Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  
+
   process.exit(1);
 }

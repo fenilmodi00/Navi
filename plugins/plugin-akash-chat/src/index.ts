@@ -54,16 +54,6 @@ const SUPPORTED_MODELS = {
   }
 } as const;
 
-// Akash Chat API constraints and configuration
-const AKASH_CONSTRAINTS = {
-  MAX_CONCURRENT: 2,
-  RATE_LIMIT_PER_MINUTE: 60,
-  MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
-  DEFAULT_TIMEOUT: 30000,
-  DEFAULT_EMBEDDING_DIMENSIONS: 1024,
-} as const;
-
 /**
  * Enhanced request queue with priority support and concurrency enforcement
  */
@@ -71,21 +61,10 @@ class EnhancedRequestQueue {
   private foregroundQueue: Array<() => Promise<any>> = [];
   private backgroundQueue: Array<() => Promise<any>> = [];
   private activeRequests = 0;
-  private maxConcurrent: number;
   private lastLogTime = 0;
 
-  constructor(maxConcurrent = AKASH_CONSTRAINTS.MAX_CONCURRENT) {
-    // Enforce Akash limits with user warning
-    if (maxConcurrent > AKASH_CONSTRAINTS.MAX_CONCURRENT) {
-      logger.warn(
-        `[AkashChat] Configured concurrency (${maxConcurrent}) exceeds Akash limit (${AKASH_CONSTRAINTS.MAX_CONCURRENT}). Using Akash limit to prevent API errors.`
-      );
-      this.maxConcurrent = AKASH_CONSTRAINTS.MAX_CONCURRENT;
-    } else {
-      this.maxConcurrent = maxConcurrent;
-    }
-
-    logger.info(`[AkashChat] Request queue initialized with max concurrency: ${this.maxConcurrent}`);
+  constructor() {
+    logger.info(`[AkashChat] Request queue initialized with no artificial concurrency limits.`);
   }
 
   async enqueue<T>(
@@ -118,30 +97,23 @@ class EnhancedRequestQueue {
 
   private async executeWithRetry<T>(requestFn: () => Promise<T>): Promise<T> {
     let lastError: Error | undefined;
-    
-    for (let attempt = 1; attempt <= AKASH_CONSTRAINTS.MAX_RETRIES; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await requestFn();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
-        if (attempt === AKASH_CONSTRAINTS.MAX_RETRIES) {
-          logger.error(`[AkashChat] All ${AKASH_CONSTRAINTS.MAX_RETRIES} retry attempts failed: ${lastError.message}`);
+        if (attempt === 3) {
+          logger.error(`[AkashChat] All 3 retry attempts failed: ${lastError.message}`);
           break;
         }
-
-        // Check if error is retryable
         if (this.isRetryableError(lastError)) {
-          const delay = AKASH_CONSTRAINTS.RETRY_DELAY * attempt;
-          logger.warn(`[AkashChat] Request failed (attempt ${attempt}/${AKASH_CONSTRAINTS.MAX_RETRIES}), retrying in ${delay}ms: ${lastError.message}`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          logger.warn(`[AkashChat] Request failed (attempt ${attempt}/3), retrying: ${lastError.message}`);
         } else {
           logger.error(`[AkashChat] Non-retryable error: ${lastError.message}`);
           break;
         }
       }
     }
-
     throw lastError;
   }
 
@@ -156,30 +128,15 @@ class EnhancedRequestQueue {
       'ECONNRESET',
       'ETIMEDOUT',
     ];
-
     const message = error.message.toLowerCase();
     return retryableMessages.some(retryMsg => message.includes(retryMsg));
   }
 
   private processQueue(): void {
-    if (this.activeRequests >= this.maxConcurrent) {
-      return;
-    }
-
-    // Log queue status periodically (every 30 seconds)
-    const now = Date.now();
-    if (now - this.lastLogTime > 30000) {
-      this.lastLogTime = now;
-      const totalQueued = this.foregroundQueue.length + this.backgroundQueue.length;
-      if (totalQueued > 0) {
-        logger.debug(`[AkashChat] Queue status: ${this.activeRequests}/${this.maxConcurrent} active, ${this.foregroundQueue.length} foreground, ${this.backgroundQueue.length} background queued`);
-      }
-    }
-
-    // Prioritize foreground requests (user chat)
-    const nextRequest = this.foregroundQueue.shift() || this.backgroundQueue.shift();
-    if (nextRequest) {
-      setTimeout(nextRequest, 0);
+    // No concurrency limit, process all queued requests immediately
+    let nextRequest;
+    while ((nextRequest = this.foregroundQueue.shift() || this.backgroundQueue.shift())) {
+      nextRequest();
     }
   }
 }
@@ -614,8 +571,7 @@ export const akashchatPlugin: Plugin = {
         }
 
         // Log configuration summary
-        const maxConcurrent = parseInt(getSetting(runtime, 'AKASH_CHAT_MAX_CONCURRENT', String(AKASH_CONSTRAINTS.MAX_CONCURRENT)) || String(AKASH_CONSTRAINTS.MAX_CONCURRENT), 10);
-        logger.info(`[AkashChat] Plugin initialized with max concurrency: ${Math.min(maxConcurrent, AKASH_CONSTRAINTS.MAX_CONCURRENT)}`);
+        logger.info(`[AkashChat] Plugin initialized with no artificial concurrency limits.`);
 
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
@@ -644,7 +600,7 @@ export const akashchatPlugin: Plugin = {
       const embeddingDimension = Number.parseInt(
         getSetting(runtime, 'AKASH_CHAT_EMBEDDING_DIMENSIONS') ||
         getSetting(runtime, 'AKASHCHAT_EMBEDDING_DIMENSIONS') ||
-        String(AKASH_CONSTRAINTS.DEFAULT_EMBEDDING_DIMENSIONS),
+        '1024',
         10
       ) as (typeof VECTOR_DIMS)[keyof typeof VECTOR_DIMS];
 
@@ -775,7 +731,7 @@ export const akashchatPlugin: Plugin = {
       {
         prompt,
         stopSequences = [],
-        maxTokens = 8192,
+        maxTokens = 2000,
         temperature = 0.7,
         frequencyPenalty = 0.7,
         presencePenalty = 0.7,
@@ -812,7 +768,7 @@ export const akashchatPlugin: Plugin = {
       {
         prompt,
         stopSequences = [],
-        maxTokens = 8192,
+        maxTokens = 14000,
         temperature = 0.7,
         frequencyPenalty = 0.7,
         presencePenalty = 0.7,

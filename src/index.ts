@@ -88,8 +88,8 @@ export const character: Character = {
   name: "Navi",
   username: "AkashNavi",
   plugins: [
+    "@elizaos/plugin-akash-chat",  // Load Akash Chat plugin FIRST for model precedence
     "@elizaos/plugin-bootstrap", 
-    "@elizaos/plugin-akash-chat",
     "@elizaos/plugin-discord",
     "@elizaos/plugin-knowledge",
     "@elizaos/plugin-web-search",
@@ -112,6 +112,7 @@ Rules:
 Reply with exactly one word: RESPOND, IGNORE, or STOP`,
   },
   settings: {
+    POSTGRES_URL: process.env.POSTGRES_URL || "",
     // Akash Chat API configuration
     AKASH_CHAT_API_KEY: process.env.AKASH_CHAT_API_KEY || "",
     AKASH_CHAT_SMALL_MODEL: process.env.AKASH_CHAT_SMALL_MODEL || "Meta-Llama-3-1-8B-Instruct-FP8",
@@ -119,8 +120,6 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
     AKASH_CHAT_BASE_URL: "https://chatapi.akash.network/api/v1",
 
     // PostgreSQL/Supabase configuration
-    POSTGRES_URL: process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || "",
-    DATABASE_URL: process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "",
 
     // Supabase configuration
 
@@ -155,7 +154,7 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
     KNOWLEDGE_PROCESSING_DELAY: "2000",
     KNOWLEDGE_MAX_DOCUMENT_SIZE: "50000",
     KNOWLEDGE_TIMEOUT: "30000",
-    DOCUMENT_PROCESSING_CONCURRENCY: "2",
+    DOCUMENT_PROCESSING_CONCURRENCY: "3",
     
     // Database connection limits - reasonable for production
     DB_MAX_CONNECTIONS: "10",
@@ -163,17 +162,17 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
     DB_CONNECTION_TIMEOUT: "15000",
     DB_ACQUIRE_TIMEOUT: "30000",
 
-    // Database connection management - prevent exhaustion
-    DATABASE_MAX_CONNECTIONS: process.env.DATABASE_MAX_CONNECTIONS || "10",
-    DATABASE_CONNECTION_TIMEOUT: process.env.DATABASE_CONNECTION_TIMEOUT || "30000",
-    DATABASE_IDLE_TIMEOUT: process.env.DATABASE_IDLE_TIMEOUT || "60000",
-    DATABASE_RETRY_ATTEMPTS: process.env.DATABASE_RETRY_ATTEMPTS || "3",
-    DATABASE_RETRY_DELAY: process.env.DATABASE_RETRY_DELAY || "1000",
+    // // Database connection management - prevent exhaustion
+    // DATABASE_MAX_CONNECTIONS: process.env.DATABASE_MAX_CONNECTIONS || "10",
+    // DATABASE_CONNECTION_TIMEOUT: process.env.DATABASE_CONNECTION_TIMEOUT || "30000",
+    // DATABASE_IDLE_TIMEOUT: process.env.DATABASE_IDLE_TIMEOUT || "60000",
+    // DATABASE_RETRY_ATTEMPTS: process.env.DATABASE_RETRY_ATTEMPTS || "3",
+    // DATABASE_RETRY_DELAY: process.env.DATABASE_RETRY_DELAY || "1000",
 
-    // Entity management - prevent duplicate inserts
-    ENTITY_CACHE_ENABLED: "true",
-    ENTITY_CACHE_TTL: "300000",
-    DUPLICATE_ENTITY_HANDLING: "skip",
+    // // Entity management - prevent duplicate inserts
+    // ENTITY_CACHE_ENABLED: "true",
+    // ENTITY_CACHE_TTL: "300000",
+    // DUPLICATE_ENTITY_HANDLING: "skip",
 
     // Fast response settings for Akash
     RESPONSE_STREAMING: "true",
@@ -186,7 +185,7 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
 
     // Model configuration for Akash optimization
     MODEL_TEMPERATURE: "0.7",
-    MODEL_MAX_TOKENS: "1200",
+    MODEL_MAX_TOKENS: "5000",
     MODEL_TOP_P: "0.9",
     MODEL_FREQUENCY_PENALTY: "0.2",
     
@@ -327,7 +326,7 @@ Reply with exactly one word: RESPOND, IGNORE, or STOP`,
   ],
 
   knowledge: [
-   
+   'data/akash-knowledge-base',
   ],
 
   messageExamples: [
