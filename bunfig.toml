@@ -1,0 +1,43 @@
+# Bun workspace configuration
+# This helps optimize dependency resolution and deduplication
+
+[workspace]
+# Define workspace root and plugins
+packages = [
+  "plugins/*"
+]
+
+# Dependency resolution settings  
+[install]
+# Use exact versions for reproducible builds
+exact = true
+
+# Enable peer dependency auto-install
+auto = true
+
+# Optimize for production builds
+production = false
+
+# Enable workspace protocol resolution
+workspace = true
+
+# Always prefer workspace packages over npm
+prefer-workspace-packages = true
+
+# Trust workspace packages
+trust-workspace-packages = true
+
+# Cache settings for faster builds
+cache = true
+
+# Dedupe dependencies aggressively  
+dedupe = true
+
+[install.optional]
+# Skip optional dependencies to reduce size
+skip = true
+
+[build]
+# Optimize builds for production
+minify = true
+target = "node18"
