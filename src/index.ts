@@ -90,7 +90,7 @@ export const character: Character = {
   plugins: [
     "@elizaos/plugin-akash-chat",  // Load Akash Chat plugin FIRST for model precedence
     "@elizaos/plugin-knowledge",
-    "@elizaos/plugin-web-search",
+    "plugin-web-search",
     "@elizaos/plugin-akash",
     "@elizaos/plugin-bootstrap", 
     "@elizaos/plugin-discord",
